@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useAuthStore } from '@/stores/auth'
 import Login from '@/pages/Login'
 import Dashboard from '@/pages/Dashboard'
+import Organization from '@/pages/Organization'
+import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
 
 function App() {
@@ -20,10 +22,23 @@ function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <Layout>
+                <Dashboard />
+              </Layout>
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/organization"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Organization />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/"
           element={
