@@ -262,4 +262,119 @@ export const organizationApi = {
     ),
 };
 
+// 角色管理API
+export const roleApi = {
+  // 获取角色列表
+  getList: (params?: {
+    institution_id?: number;
+    search?: string;
+    status?: string;
+    per_page?: number;
+    page?: number;
+  }) =>
+    api.get<ApiResponse<PaginatedResponse<any>>>("/admin/roles", { params }),
+
+  // 获取角色详情
+  getDetail: (id: number) => api.get<ApiResponse<any>>(`/admin/roles/${id}`),
+
+  // 创建角色
+  create: (data: {
+    name: string;
+    code: string;
+    description: string;
+    institution_id: number;
+    permission_ids: number[];
+    menu_ids: number[];
+    data_permission_ids: number[];
+  }) => api.post<ApiResponse<any>>("/admin/roles", data),
+
+  // 更新角色
+  update: (
+    id: number,
+    data: {
+      name?: string;
+      description?: string;
+      permission_ids?: number[];
+      menu_ids?: number[];
+      data_permission_ids?: number[];
+    }
+  ) => api.put<ApiResponse<any>>(`/admin/roles/${id}`, data),
+
+  // 删除角色
+  delete: (id: number) => api.delete<ApiResponse<null>>(`/admin/roles/${id}`),
+};
+
+// 权限管理API
+export const permissionApi = {
+  // 获取功能权限树
+  getPermissions: () => api.get<ApiResponse<any>>("/admin/permissions"),
+
+  // 获取数据权限列表
+  getDataPermissions: () =>
+    api.get<ApiResponse<any>>("/admin/permissions/data"),
+
+  // 获取所有权限（用于角色配置）
+  getAllPermissions: () => api.get<ApiResponse<any>>("/admin/permissions/all"),
+};
+
+// 菜单管理API
+export const menuApi = {
+  // 获取菜单树
+  getTree: () => api.get<ApiResponse<any>>("/admin/system-menus"),
+
+  // 获取菜单列表
+  getList: () => api.get<ApiResponse<any>>("/admin/system-menus-list"),
+};
+
+// 用户管理API
+export const userApi = {
+  // 获取用户列表
+  getList: (params?: {
+    search?: string;
+    institution_id?: number;
+    department_id?: number;
+    status?: string;
+    per_page?: number;
+    page?: number;
+  }) =>
+    api.get<ApiResponse<PaginatedResponse<any>>>("/admin/users", { params }),
+
+  // 获取用户详情
+  getDetail: (id: number) => api.get<ApiResponse<any>>(`/admin/users/${id}`),
+
+  // 创建用户
+  create: (data: {
+    name: string;
+    phone: string;
+    email?: string;
+    password: string;
+    institution_id: number;
+    department_id?: number;
+    role_ids: number[];
+  }) => api.post<ApiResponse<any>>("/admin/users", data),
+
+  // 更新用户
+  update: (
+    id: number,
+    data: {
+      name?: string;
+      phone?: string;
+      email?: string;
+      institution_id?: number;
+      department_id?: number;
+      status?: string;
+    }
+  ) => api.put<ApiResponse<any>>(`/admin/users/${id}`, data),
+
+  // 分配用户角色
+  assignRoles: (id: number, roleIds: number[]) =>
+    api.put<ApiResponse<any>>(`/admin/users/${id}/roles`, {
+      role_ids: roleIds,
+    }),
+
+  // 删除用户
+  delete: (id: number) => api.delete<ApiResponse<null>>(`/admin/users/${id}`),
+};
+
+export { api };
 export default api;

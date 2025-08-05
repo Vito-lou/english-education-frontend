@@ -1,0 +1,305 @@
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/toast';
+import RoleList from './RoleList';
+import RoleEditor from './RoleEditor';
+import { roleApi, permissionApi, menuApi } from '@/lib/api';
+import { Plus, Save, RotateCcw } from 'lucide-react';
+
+interface Role {
+  id: number;
+  name: string;
+  code: string;
+  description: string;
+  institution_id: number | null;
+  is_system: boolean;
+  status: string;
+  permissions: Permission[];
+  dataPermissions: DataPermission[];
+}
+
+interface Permission {
+  id: number;
+  name: string;
+  code: string;
+  type: string;
+  children?: Permission[];
+}
+
+interface DataPermission {
+  id: number;
+  name: string;
+  code: string;
+  resource_type: string;
+  scope_type: 'all' | 'partial';
+}
+
+const RoleManagement: React.FC = () => {
+  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // 获取角色列表
+  const { data: rolesData, isLoading: rolesLoading } = useQuery({
+    queryKey: ['roles'],
+    queryFn: async () => {
+      const response = await roleApi.getList();
+      return response.data;
+    },
+  });
+
+  // 获取所有权限
+  const { data: permissionsData } = useQuery({
+    queryKey: ['permissions', 'all'],
+    queryFn: async () => {
+      const response = await permissionApi.getAllPermissions();
+      return response.data;
+    },
+  });
+
+  // 获取菜单数据
+  const { data: menusData } = useQuery({
+    queryKey: ['system-menus-tree'],
+    queryFn: async () => {
+      const response = await menuApi.getTree();
+      return response.data;
+    },
+  });
+
+  const roles = rolesData?.data?.data || [];
+  const permissions = permissionsData?.data?.permissions || [];
+  const dataPermissions = permissionsData?.data?.data_permissions || {};
+  const menus = menusData?.data || [];
+
+  // 保存角色权限
+  const saveRoleMutation = useMutation({
+    mutationFn: async (data: {
+      roleId: number;
+      name: string;
+      description: string;
+      permission_ids: number[];
+      menu_ids: number[];
+      data_permission_ids: number[];
+    }) => {
+      const response = await roleApi.update(data.roleId, {
+        name: data.name,
+        description: data.description,
+        permission_ids: data.permission_ids,
+        menu_ids: data.menu_ids,
+        data_permission_ids: data.data_permission_ids,
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      setHasUnsavedChanges(false);
+      toast({
+        title: '保存成功',
+        description: '角色权限已更新',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: '保存失败',
+        description: error.response?.data?.message || '保存角色权限时发生错误',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // 创建新角色
+  const createRoleMutation = useMutation({
+    mutationFn: async (data: {
+      name: string;
+      code: string;
+      description: string;
+      institution_id: number;
+      permission_ids: number[];
+      menu_ids: number[];
+      data_permission_ids: number[];
+    }) => {
+      const response = await roleApi.create(data);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      setSelectedRoleId(data.data.id);
+      setIsCreating(false);
+      setHasUnsavedChanges(false);
+      toast({
+        title: '创建成功',
+        description: '新角色已创建',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: '创建失败',
+        description: error.response?.data?.message || '创建角色时发生错误',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // 选择角色时更新选中状态
+  useEffect(() => {
+    if (selectedRoleId && roles.length > 0) {
+      const role = roles.find((r: Role) => r.id === selectedRoleId);
+      setSelectedRole(role || null);
+    } else if (roles.length > 0 && !selectedRoleId && !isCreating) {
+      // 默认选中第一个角色
+      const firstRole = roles[0];
+      setSelectedRoleId(firstRole.id);
+      setSelectedRole(firstRole);
+    }
+  }, [selectedRoleId, roles, isCreating]);
+
+  const handleRoleSelect = (roleId: number) => {
+    if (hasUnsavedChanges) {
+      if (!confirm('有未保存的更改，确定要切换角色吗？')) {
+        return;
+      }
+    }
+    setSelectedRoleId(roleId);
+    setHasUnsavedChanges(false);
+    setIsCreating(false);
+  };
+
+  const handleCreateNew = () => {
+    if (hasUnsavedChanges) {
+      if (!confirm('有未保存的更改，确定要创建新角色吗？')) {
+        return;
+      }
+    }
+    setIsCreating(true);
+    setSelectedRoleId(null);
+    setSelectedRole(null);
+    setHasUnsavedChanges(false);
+  };
+
+  const handleSave = (data: {
+    name: string;
+    description: string;
+    permission_ids: number[];
+    menu_ids: number[];
+    data_permission_ids: number[];
+  }) => {
+    if (isCreating) {
+      // 创建新角色 - 这里需要机构ID，暂时使用1
+      createRoleMutation.mutate({
+        ...data,
+        code: data.name.toLowerCase().replace(/\s+/g, '_'),
+        institution_id: 1, // TODO: 从用户信息获取机构ID
+      });
+    } else if (selectedRoleId) {
+      // 更新现有角色
+      saveRoleMutation.mutate({
+        roleId: selectedRoleId,
+        ...data,
+      });
+    }
+  };
+
+  const handleReset = () => {
+    setHasUnsavedChanges(false);
+    // 重新加载角色数据
+    if (selectedRoleId) {
+      const role = roles.find((r: Role) => r.id === selectedRoleId);
+      setSelectedRole(role || null);
+    }
+  };
+
+  if (rolesLoading) {
+    return <div className="flex justify-center items-center h-64">加载中...</div>;
+  }
+
+  return (
+    <div className="grid grid-cols-12 gap-6 h-[calc(100vh-200px)]">
+      {/* 左侧角色列表 */}
+      <div className="col-span-4">
+        <Card className="h-full">
+          <div className="p-4 border-b">
+            <Button
+              onClick={handleCreateNew}
+              className="w-full"
+              disabled={createRoleMutation.isPending}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              新建角色
+            </Button>
+          </div>
+          <div className="p-4 h-[calc(100%-80px)] overflow-y-auto">
+            <RoleList
+              roles={roles}
+              selectedRoleId={selectedRoleId}
+              onRoleSelect={handleRoleSelect}
+              isCreating={isCreating}
+            />
+          </div>
+        </Card>
+      </div>
+
+      {/* 右侧角色编辑区 */}
+      <div className="col-span-8">
+        <Card className="h-full">
+          <div className="p-4 border-b flex justify-between items-center">
+            <h3 className="text-lg font-medium">
+              {isCreating ? '创建新角色' : selectedRole?.name || '选择角色'}
+            </h3>
+            {(selectedRole || isCreating) && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReset}
+                  disabled={!hasUnsavedChanges}
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  重置
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    // 这里需要从 RoleEditor 获取数据
+                    // 暂时留空，在 RoleEditor 中处理
+                  }}
+                  disabled={!hasUnsavedChanges || saveRoleMutation.isPending || createRoleMutation.isPending}
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {saveRoleMutation.isPending || createRoleMutation.isPending ? '保存中...' : '保存更改'}
+                </Button>
+              </div>
+            )}
+          </div>
+          <div className="p-4 h-[calc(100%-80px)] overflow-y-auto">
+            {(selectedRole || isCreating) ? (
+              <RoleEditor
+                role={selectedRole}
+                permissions={permissions}
+                menus={menus}
+                dataPermissions={dataPermissions}
+                onSave={handleSave}
+                onChange={() => setHasUnsavedChanges(true)}
+                isCreating={isCreating}
+                isSaving={saveRoleMutation.isPending || createRoleMutation.isPending}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-500">
+                请选择一个角色进行编辑
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default RoleManagement;
