@@ -32,6 +32,11 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem("auth_token");
       window.location.href = "/login";
+    } else if (error.response?.status === 403) {
+      // 用户被禁用
+      localStorage.removeItem("auth_token");
+      alert("账户已被禁用，请联系管理员");
+      window.location.href = "/login";
     }
     return Promise.reject(error);
   }
@@ -115,7 +120,7 @@ export interface OrganizationNode {
 
 // 创建节点的数据类型
 export interface CreateNodeData {
-  type: "institution" | "campus" | "department" | "classroom";
+  type: "institution" | "campus" | "department";
   parent_id?: number;
   name: string;
   code: string;
@@ -123,8 +128,6 @@ export interface CreateNodeData {
   manager_name?: string;
   manager_phone?: string;
   address?: string;
-  capacity?: number;
-  facilities?: string[];
   sort_order?: number;
   status?: "active" | "inactive";
 

@@ -28,7 +28,7 @@ const MenuPermissionSelector: React.FC<MenuPermissionSelectorProps> = ({
   const getMenuState = (menu: SystemMenu): { checked: boolean; indeterminate: boolean } => {
     const allChildIds = getAllChildIds(menu);
     const selectedCount = allChildIds.filter(id => selectedIds.includes(id)).length;
-    
+
     if (selectedCount === 0) {
       return { checked: false, indeterminate: false };
     } else if (selectedCount === allChildIds.length) {
@@ -75,7 +75,7 @@ const MenuPermissionSelector: React.FC<MenuPermissionSelectorProps> = ({
   const renderMenuItem = (menu: SystemMenu, level = 0) => {
     const hasChildren = menu.children_items && menu.children_items.length > 0;
     const { checked, indeterminate } = getMenuState(menu);
-    
+
     return (
       <div key={menu.id} className="space-y-2">
         {/* 菜单项 */}
@@ -106,11 +106,11 @@ const MenuPermissionSelector: React.FC<MenuPermissionSelectorProps> = ({
   // 按模块分组显示
   const renderMenuGroups = () => {
     const rootMenus = menus.filter(menu => !menu.parent_id);
-    
+
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {rootMenus.map(menu => (
-          <div key={menu.id} className="border border-gray-200 rounded-lg p-4">
+          <div key={menu.id} className="p-3">
             {renderMenuItem(menu)}
           </div>
         ))}
@@ -130,17 +130,6 @@ const MenuPermissionSelector: React.FC<MenuPermissionSelectorProps> = ({
     <div className="space-y-4">
       {/* 菜单权限选择器 */}
       {renderMenuGroups()}
-      
-      {/* 权限说明 */}
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h6 className="text-sm font-medium text-blue-900 mb-2">功能权限说明</h6>
-        <ul className="text-xs text-blue-700 space-y-1">
-          <li>• <strong>父菜单</strong>：勾选后该角色可以看到整个菜单模块</li>
-          <li>• <strong>子菜单</strong>：可以单独勾选，只显示特定的子功能</li>
-          <li>• <strong>半选状态</strong>：表示只选择了部分子菜单</li>
-          <li>• <strong>全选状态</strong>：表示选择了所有子菜单</li>
-        </ul>
-      </div>
     </div>
   );
 };

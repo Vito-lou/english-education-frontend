@@ -13,13 +13,11 @@ import { Department } from '@/lib/api';
 const departmentSchema = z.object({
   name: z.string().min(1, '部门名称不能为空').max(100, '部门名称不能超过100个字符'),
   code: z.string().min(1, '部门代码不能为空').max(50, '部门代码不能超过50个字符'),
-  type: z.enum(['campus', 'department', 'classroom']),
+  type: z.enum(['campus', 'department']),
   description: z.string().optional(),
   manager_name: z.string().optional(),
   manager_phone: z.string().optional(),
   address: z.string().optional(),
-  capacity: z.number().min(1, '容量必须大于0').optional(),
-  facilities: z.array(z.string()).optional(),
   sort_order: z.number().min(0, '排序不能为负数').optional(),
   status: z.enum(['active', 'inactive']),
 });
@@ -59,8 +57,6 @@ const DepartmentForm: React.FC<DepartmentFormProps> = ({
       manager_name: department?.manager_name || '',
       manager_phone: department?.manager_phone || '',
       address: department?.address || '',
-      capacity: department?.capacity || undefined,
-      facilities: department?.facilities || [],
       sort_order: department?.sort_order || 0,
       status: department?.status || 'active',
     },
@@ -68,7 +64,6 @@ const DepartmentForm: React.FC<DepartmentFormProps> = ({
 
   const typeValue = watch('type');
   const statusValue = watch('status');
-  const facilitiesValue = watch('facilities') || [];
 
   const handleFormSubmit = (data: DepartmentFormData) => {
     onSubmit({
@@ -76,22 +71,6 @@ const DepartmentForm: React.FC<DepartmentFormProps> = ({
       institution_id: institutionId,
       parent_id: parentDepartment?.id,
     });
-  };
-
-  const addFacility = () => {
-    const newFacilities = [...facilitiesValue, ''];
-    setValue('facilities', newFacilities);
-  };
-
-  const removeFacility = (index: number) => {
-    const newFacilities = facilitiesValue.filter((_, i) => i !== index);
-    setValue('facilities', newFacilities);
-  };
-
-  const updateFacility = (index: number, value: string) => {
-    const newFacilities = [...facilitiesValue];
-    newFacilities[index] = value;
-    setValue('facilities', newFacilities);
   };
 
   return (
@@ -140,7 +119,7 @@ const DepartmentForm: React.FC<DepartmentFormProps> = ({
               <Label htmlFor="type">部门类型 *</Label>
               <Select
                 value={typeValue}
-                onValueChange={(value) => setValue('type', value as 'campus' | 'department' | 'classroom')}
+                onValueChange={(value) => setValue('type', value as 'campus' | 'department')}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="请选择部门类型" />
@@ -148,7 +127,6 @@ const DepartmentForm: React.FC<DepartmentFormProps> = ({
                 <SelectContent>
                   <SelectItem value="campus">校区</SelectItem>
                   <SelectItem value="department">部门</SelectItem>
-                  <SelectItem value="classroom">教室</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -210,54 +188,7 @@ const DepartmentForm: React.FC<DepartmentFormProps> = ({
             />
           </div>
 
-          {/* 教室特有字段 */}
-          {typeValue === 'classroom' && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="capacity">容量</Label>
-                <Input
-                  id="capacity"
-                  type="number"
-                  {...register('capacity', { valueAsNumber: true })}
-                  placeholder="请输入教室容量"
-                />
-                {errors.capacity && (
-                  <p className="text-sm text-red-600">{errors.capacity.message}</p>
-                )}
-              </div>
 
-              <div className="space-y-2">
-                <Label>设施设备</Label>
-                <div className="space-y-2">
-                  {facilitiesValue.map((facility, index) => (
-                    <div key={index} className="flex gap-2">
-                      <Input
-                        value={facility}
-                        onChange={(e) => updateFacility(index, e.target.value)}
-                        placeholder="请输入设施名称"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeFacility(index)}
-                      >
-                        删除
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addFacility}
-                  >
-                    添加设施
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
 
           <div className="space-y-2">
             <Label htmlFor="sort_order">排序</Label>

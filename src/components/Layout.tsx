@@ -123,8 +123,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </header>
 
-        {/* 页面内容 - 可滚动 */}
-        <main className="flex-1 overflow-y-auto p-6">
+        {/* 页面内容 - 让子组件控制滚动 */}
+        <main className="flex-1 overflow-hidden p-6">
           {children}
         </main>
       </div>

@@ -15,7 +15,7 @@ async function login() {
         password: 'password'
       })
     });
-    
+
     const data = await response.json();
     if (data.success) {
       return data.data.token;
@@ -65,7 +65,7 @@ async function createInstitution(token) {
         established_at: '2020-01-01'
       })
     });
-    
+
     const data = await response.json();
     if (data.success) {
       console.log('Institution created:', data.data);
@@ -94,7 +94,7 @@ async function createDepartment(token, institutionId, departmentData) {
         ...departmentData
       })
     });
-    
+
     const data = await response.json();
     if (data.success) {
       console.log('Department created:', data.data);
@@ -111,7 +111,7 @@ async function createDepartment(token, institutionId, departmentData) {
 // 主函数
 async function main() {
   console.log('Starting test data creation...');
-  
+
   // 1. 登录
   const token = await login();
   if (!token) {
@@ -119,14 +119,14 @@ async function main() {
     return;
   }
   console.log('Login successful');
-  
+
   // 2. 创建机构
   const institution = await createInstitution(token);
   if (!institution) {
     console.error('Failed to create institution');
     return;
   }
-  
+
   // 3. 创建朝阳校区
   const chaoyangCampus = await createDepartment(token, institution.id, {
     name: '朝阳校区',
@@ -139,7 +139,7 @@ async function main() {
     sort_order: 1,
     status: 'active'
   });
-  
+
   if (chaoyangCampus) {
     // 4. 创建教学部
     const teachingDept = await createDepartment(token, institution.id, {
@@ -153,35 +153,9 @@ async function main() {
       sort_order: 1,
       status: 'active'
     });
-    
-    if (teachingDept) {
-      // 5. 创建教室A
-      await createDepartment(token, institution.id, {
-        parent_id: teachingDept.id,
-        name: '教室A',
-        code: 'ROOM_A',
-        type: 'classroom',
-        description: '多媒体教室，适合小班教学',
-        capacity: 12,
-        facilities: ['投影仪', '白板', '音响', '空调'],
-        sort_order: 1,
-        status: 'active'
-      });
-      
-      // 6. 创建教室B
-      await createDepartment(token, institution.id, {
-        parent_id: teachingDept.id,
-        name: '教室B',
-        code: 'ROOM_B',
-        type: 'classroom',
-        description: '标准教室，适合中班教学',
-        capacity: 16,
-        facilities: ['投影仪', '白板', '音响'],
-        sort_order: 2,
-        status: 'active'
-      });
-    }
-    
+
+
+
     // 7. 创建销售部
     await createDepartment(token, institution.id, {
       parent_id: chaoyangCampus.id,
@@ -195,7 +169,7 @@ async function main() {
       status: 'active'
     });
   }
-  
+
   // 8. 创建海淀校区
   const haidianCampus = await createDepartment(token, institution.id, {
     name: '海淀校区',
@@ -208,7 +182,7 @@ async function main() {
     sort_order: 2,
     status: 'active'
   });
-  
+
   if (haidianCampus) {
     // 9. 创建海淀教学部
     await createDepartment(token, institution.id, {
@@ -223,7 +197,7 @@ async function main() {
       status: 'active'
     });
   }
-  
+
   console.log('Test data creation completed!');
 }
 

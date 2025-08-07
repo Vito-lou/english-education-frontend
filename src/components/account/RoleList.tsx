@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ChevronDown, ChevronRight, Search, Settings, Shield } from 'lucide-react';
+import { ChevronDown, ChevronRight, Search, Settings, Shield, Trash2 } from 'lucide-react';
 
 interface Role {
   id: number;
@@ -18,6 +18,7 @@ interface RoleListProps {
   roles: Role[];
   selectedRoleId: number | null;
   onRoleSelect: (roleId: number) => void;
+  onRoleDelete: (roleId: number) => void;
   isCreating: boolean;
 }
 
@@ -25,6 +26,7 @@ const RoleList: React.FC<RoleListProps> = ({
   roles,
   selectedRoleId,
   onRoleSelect,
+  onRoleDelete,
   isCreating,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,14 +54,20 @@ const RoleList: React.FC<RoleListProps> = ({
 
   const RoleItem: React.FC<{ role: Role }> = ({ role }) => {
     const isSelected = selectedRoleId === role.id;
-    
+
+    const handleDelete = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (confirm(`确定要删除角色"${role.name}"吗？此操作不可恢复。`)) {
+        onRoleDelete(role.id);
+      }
+    };
+
     return (
       <div
-        className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors ${
-          isSelected
-            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-            : 'hover:bg-gray-50'
-        }`}
+        className={`flex items-center p-3 rounded-lg cursor-pointer transition-colors group ${isSelected
+          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+          : 'hover:bg-gray-50'
+          }`}
         onClick={() => onRoleSelect(role.id)}
       >
         <div className="flex-1 min-w-0">
@@ -77,11 +85,21 @@ const RoleList: React.FC<RoleListProps> = ({
             </p>
           )}
         </div>
-        {isSelected && (
-          <div className="ml-2">
+        <div className="flex items-center gap-2 ml-2">
+          {!role.is_system && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDelete}
+              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 h-auto text-red-500 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
+          {isSelected && (
             <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   };
@@ -147,7 +165,7 @@ const RoleList: React.FC<RoleListProps> = ({
           expanded={expandedGroups.custom}
           onToggle={() => toggleGroup('custom')}
         />
-        
+
         {expandedGroups.custom && (
           <div className="space-y-1 ml-6">
             {customRoles.length > 0 ? (
@@ -172,7 +190,7 @@ const RoleList: React.FC<RoleListProps> = ({
           expanded={expandedGroups.system}
           onToggle={() => toggleGroup('system')}
         />
-        
+
         {expandedGroups.system && (
           <div className="space-y-1 ml-6">
             {systemRoles.length > 0 ? (

@@ -241,31 +241,33 @@ const Organization: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col">
-      {/* 顶部工具栏 */}
-      <div className="flex items-center justify-between p-4 border-b">
+      {/* 页面标题 */}
+      <div className="flex items-center p-4 border-b">
         <h1 className="text-2xl font-bold">组织架构</h1>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input
-              placeholder="搜索组织..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-64"
-            />
-          </div>
-          <Button onClick={() => handleAddChild()}>
-            <Plus className="w-4 h-4 mr-2" />
-            添加机构
-          </Button>
-        </div>
       </div>
 
       {/* 主要内容区 */}
       <div className="flex-1 p-6">
-        <Card className="h-full">
-          <CardHeader>
-            <CardTitle className="text-lg">组织结构树</CardTitle>
+        <Card className="h-full flex flex-col">
+          <CardHeader className="flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">组织结构树</CardTitle>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="搜索组织..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 w-64"
+                  />
+                </div>
+                <Button onClick={() => handleAddChild()}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  添加机构
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="flex-1 overflow-auto">
             {filteredTreeData.length > 0 ? (

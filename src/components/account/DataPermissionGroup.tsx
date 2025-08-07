@@ -54,6 +54,13 @@ const DataPermissionGroup: React.FC<DataPermissionGroupProps> = ({
       newSelectedIds.push(permissionId);
     }
 
+    console.log('数据权限变化:', {
+      resourceType,
+      permissionId,
+      newSelectedIds,
+      oldSelectedIds: selectedIds
+    });
+
     onChange(newSelectedIds);
   };
 
@@ -70,7 +77,7 @@ const DataPermissionGroup: React.FC<DataPermissionGroupProps> = ({
     }
 
     return (
-      <div className="space-y-3 p-4 border border-gray-200 rounded-lg">
+      <div className="space-y-3 p-4">
         <div className="flex items-center gap-2">
           <h5 className="font-medium text-gray-900">
             {resourceTypeNames[resourceType] || resourceType}
@@ -84,14 +91,17 @@ const DataPermissionGroup: React.FC<DataPermissionGroupProps> = ({
 
         <div className="space-y-2">
           {/* 全部数据选项 */}
-          <label className="flex items-center space-x-3 cursor-pointer">
+          <div
+            className="flex items-center space-x-3 cursor-pointer"
+            onClick={() => handlePermissionChange(resourceType, allPermission.id)}
+          >
             <input
               type="radio"
               name={`data-permission-${resourceType}`}
               checked={selectedPermission?.id === allPermission.id}
-              onChange={() => handlePermissionChange(resourceType, allPermission.id)}
+              onChange={() => { }} // 空函数，点击由父div处理
               disabled={disabled}
-              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 disabled:opacity-50"
+              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 disabled:opacity-50 pointer-events-none"
             />
             <div className="flex-1">
               <span className="text-sm font-medium text-gray-900">全部数据</span>
@@ -99,17 +109,20 @@ const DataPermissionGroup: React.FC<DataPermissionGroupProps> = ({
                 {allPermission.name.replace(/.*-/, '')}
               </p>
             </div>
-          </label>
+          </div>
 
           {/* 部分数据选项 */}
-          <label className="flex items-center space-x-3 cursor-pointer">
+          <div
+            className="flex items-center space-x-3 cursor-pointer"
+            onClick={() => handlePermissionChange(resourceType, partialPermission.id)}
+          >
             <input
               type="radio"
               name={`data-permission-${resourceType}`}
               checked={selectedPermission?.id === partialPermission.id}
-              onChange={() => handlePermissionChange(resourceType, partialPermission.id)}
+              onChange={() => { }} // 空函数，点击由父div处理
               disabled={disabled}
-              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 disabled:opacity-50"
+              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500 disabled:opacity-50 pointer-events-none"
             />
             <div className="flex-1">
               <span className="text-sm font-medium text-gray-900">部分数据</span>
@@ -117,7 +130,7 @@ const DataPermissionGroup: React.FC<DataPermissionGroupProps> = ({
                 {partialPermission.name.replace(/.*-/, '')}
               </p>
             </div>
-          </label>
+          </div>
         </div>
       </div>
     );
@@ -142,17 +155,6 @@ const DataPermissionGroup: React.FC<DataPermissionGroupProps> = ({
             permissions={permissions}
           />
         ))}
-      </div>
-
-      {/* 权限说明 */}
-      <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <h6 className="text-sm font-medium text-blue-900 mb-2">数据权限说明</h6>
-        <ul className="text-xs text-blue-700 space-y-1">
-          <li>• <strong>全部数据</strong>：可以查看该类型的所有数据</li>
-          <li>• <strong>部分数据</strong>：只能查看与自己相关的数据（如分配给自己的学员、负责的班级等）</li>
-          <li>• 每种数据类型只能选择一种权限级别</li>
-          <li>• 未选择的数据类型将无法访问</li>
-        </ul>
       </div>
     </div>
   );
