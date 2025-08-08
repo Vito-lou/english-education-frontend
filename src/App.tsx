@@ -7,6 +7,8 @@ import Account from '@/pages/Account'
 import SystemMenu from '@/pages/SystemMenu'
 import Debug from '@/pages/Debug'
 import CheckboxTest from '@/pages/CheckboxTest'
+import Courses from '@/pages/academic/Courses'
+import CourseDetail from '@/pages/academic/CourseDetail'
 import PlaceholderPage from '@/components/PlaceholderPage'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -110,6 +112,26 @@ function App() {
                   icon="👨‍🏫"
                   features={["教师档案", "资质管理", "课程分配", "绩效考核"]}
                 />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/academic/courses"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Courses />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/academic/courses/:id"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <CourseDetail />
               </Layout>
             </ProtectedRoute>
           }
