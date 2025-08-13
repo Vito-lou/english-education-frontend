@@ -101,7 +101,7 @@ export default function Login() {
           <div className="mt-4 text-center text-sm text-gray-600">
             <p>测试账户：</p>
             <p>管理员：admin@example.com / admin123</p>
-            <p>普通用户：test@example.com / password</p>
+            <p>测试用户：test@example.com / password</p>
           </div>
         </CardContent>
       </Card>
