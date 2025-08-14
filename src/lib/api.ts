@@ -494,6 +494,8 @@ export const classApi = {
 
   // 获取班级详情
   get: (id: number) => api.get<ApiResponse<ClassModel>>(`/admin/classes/${id}`),
+  show: (id: number) =>
+    api.get<ApiResponse<ClassModel>>(`/admin/classes/${id}`),
 
   // 创建班级
   create: (data: {

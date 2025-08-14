@@ -11,6 +11,7 @@ import Courses from '@/pages/academic/Courses'
 import CourseDetail from '@/pages/academic/CourseDetail'
 import Students from '@/pages/academic/Students'
 import Classes from '@/pages/academic/Classes'
+import ClassDetail from '@/pages/academic/ClassDetail'
 import PlaceholderPage from '@/components/PlaceholderPage'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -76,6 +77,16 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Classes />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/academic/classes/:id"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <ClassDetail />
                 </Layout>
               </ProtectedRoute>
             }

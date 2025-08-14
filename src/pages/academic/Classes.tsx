@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Search, MoreHorizontal, Edit, Trash2, GraduationCap, Users, UserCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ const Classes: React.FC = () => {
 
   const { addToast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // 获取班级列表
   const { data: classesData, isLoading } = useQuery({
@@ -154,10 +156,20 @@ const Classes: React.FC = () => {
     setShowGraduateDialog(true);
   };
 
-  // 处理详情页跳转（暂时用编辑代替）
-  const handleDetail = (classItem: ClassModel) => {
-    // TODO: 跳转到班级详情页
-    handleEdit(classItem);
+  // 处理详情页跳转
+  const handleDetail = (classItem: ClassModel, tab?: string) => {
+    const url = `/academic/classes/${classItem.id}${tab ? `?tab=${tab}` : ''}`;
+    navigate(url);
+  };
+
+  // 处理学员管理
+  const handleStudentManagement = (classItem: ClassModel) => {
+    handleDetail(classItem, 'students');
+  };
+
+  // 处理点名
+  const handleAttendance = (classItem: ClassModel) => {
+    handleDetail(classItem, 'attendance');
   };
 
 
@@ -333,11 +345,11 @@ const Classes: React.FC = () => {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleDetail(classItem)}>
+                            <DropdownMenuItem onClick={() => handleStudentManagement(classItem)}>
                               <Users className="mr-2 h-4 w-4" />
                               学员管理
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDetail(classItem)}>
+                            <DropdownMenuItem onClick={() => handleAttendance(classItem)}>
                               <UserCheck className="mr-2 h-4 w-4" />
                               点名
                             </DropdownMenuItem>
