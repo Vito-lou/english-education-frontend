@@ -118,6 +118,39 @@ export interface OrganizationNode {
   level?: number;
 }
 
+// 课程相关类型
+export interface Course {
+  id: number;
+  subject_id: number;
+  name: string;
+  code: string;
+  description?: string;
+  has_levels: boolean;
+  institution_id: number;
+  sort_order: number;
+  status: "active" | "inactive";
+  created_at: string;
+  updated_at: string;
+  // 关联数据
+  subject?: {
+    id: number;
+    name: string;
+  };
+  levels?: CourseLevel[];
+}
+
+export interface CourseLevel {
+  id: number;
+  course_id: number;
+  name: string;
+  code: string;
+  description?: string;
+  sort_order: number;
+  status: "active" | "inactive";
+  created_at: string;
+  updated_at: string;
+}
+
 // 创建节点的数据类型
 export interface CreateNodeData {
   type: "institution" | "campus" | "department";
@@ -197,6 +230,26 @@ export const institutionApi = {
 // 部门管理API
 export const departmentApi = {
   // 获取部门列表
+  list: (params?: {
+    institution_id?: number;
+    type?: string;
+    parent_id?: number;
+    search?: string;
+    status?: string;
+    per_page?: number;
+    page?: number;
+  }) =>
+    api.get<ApiResponse<PaginatedResponse<Department>>>("/admin/departments", {
+      params,
+    }),
+
+  // 获取部门选项（用于下拉框）
+  options: (params?: { type?: string }) =>
+    api.get<ApiResponse<Department[]>>("/admin/departments-options", {
+      params,
+    }),
+
+  // 获取部门列表（别名，保持兼容性）
   getList: (params?: {
     institution_id?: number;
     type?: string;
@@ -337,6 +390,7 @@ export const userApi = {
     institution_id?: number;
     department_id?: number;
     status?: string;
+    role?: string;
     per_page?: number;
     page?: number;
   }) =>
@@ -377,7 +431,152 @@ export const userApi = {
 
   // 删除用户
   delete: (id: number) => api.delete<ApiResponse<null>>(`/admin/users/${id}`),
+
+  // 获取用户选项（用于下拉框）
+  options: (params?: { role?: string }) =>
+    api.get<ApiResponse<any[]>>("/admin/users-options", {
+      params,
+    }),
 };
+
+// 课程管理 API
+export const courseApi = {
+  // 获取课程列表
+  list: (params?: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    status?: string;
+    subject_id?: number;
+  }) =>
+    api.get<ApiResponse<PaginatedResponse<Course>>>("/admin/courses", {
+      params,
+    }),
+
+  // 获取课程详情
+  get: (id: number) => api.get<ApiResponse<Course>>(`/admin/courses/${id}`),
+
+  // 获取课程级别
+  getLevels: (courseId: number) =>
+    api.get<ApiResponse<CourseLevel[]>>(`/admin/courses/${courseId}/levels`),
+
+  // 创建课程
+  create: (data: Partial<Course>) =>
+    api.post<ApiResponse<Course>>("/admin/courses", data),
+
+  // 更新课程
+  update: (id: number, data: Partial<Course>) =>
+    api.put<ApiResponse<Course>>(`/admin/courses/${id}`, data),
+
+  // 删除课程
+  delete: (id: number) => api.delete<ApiResponse<null>>(`/admin/courses/${id}`),
+
+  // 获取课程选项（用于下拉框）
+  options: () => api.get<ApiResponse<Course[]>>("/admin/courses-options"),
+};
+
+// 班级管理 API
+export const classApi = {
+  // 获取班级列表
+  list: (params?: {
+    page?: number;
+    per_page?: number;
+    search?: string;
+    status?: string;
+    campus_id?: number;
+    course_id?: number;
+    sort_by?: string;
+    sort_order?: string;
+  }) =>
+    api.get<ApiResponse<PaginatedResponse<ClassModel>>>("/admin/classes", {
+      params,
+    }),
+
+  // 获取班级详情
+  get: (id: number) => api.get<ApiResponse<ClassModel>>(`/admin/classes/${id}`),
+
+  // 创建班级
+  create: (data: {
+    name: string;
+    campus_id: number;
+    course_id: number;
+    level_id?: number;
+    max_students: number;
+    teacher_id: number;
+    total_lessons: number;
+    remarks?: string;
+  }) => api.post<ApiResponse<ClassModel>>("/admin/classes", data),
+
+  // 更新班级
+  update: (
+    id: number,
+    data: {
+      name: string;
+      campus_id: number;
+      course_id: number;
+      level_id?: number;
+      max_students: number;
+      teacher_id: number;
+      total_lessons: number;
+      remarks?: string;
+    }
+  ) => api.put<ApiResponse<ClassModel>>(`/admin/classes/${id}`, data),
+
+  // 删除班级
+  delete: (id: number) => api.delete<ApiResponse<null>>(`/admin/classes/${id}`),
+
+  // 结业班级
+  graduate: (id: number) =>
+    api.post<ApiResponse<ClassModel>>(`/admin/classes/${id}/graduate`),
+
+  // 获取班级统计
+  statistics: () =>
+    api.get<ApiResponse<ClassStats>>("/admin/classes-statistics"),
+};
+
+// 班级相关类型
+export interface ClassModel {
+  id: number;
+  name: string;
+  campus_id: number;
+  course_id: number;
+  level_id?: number;
+  max_students: number;
+  teacher_id: number;
+  total_lessons: number;
+  status: "active" | "graduated";
+  start_date: string;
+  end_date?: string;
+  remarks?: string;
+  institution_id: number;
+  current_student_count: number;
+  capacity_info: string;
+  status_name: string;
+  campus: {
+    id: number;
+    name: string;
+  };
+  course: {
+    id: number;
+    name: string;
+  };
+  level?: {
+    id: number;
+    name: string;
+  };
+  teacher: {
+    id: number;
+    name: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClassStats {
+  total: number;
+  active: number;
+  graduated: number;
+}
 
 export { api };
 export default api;

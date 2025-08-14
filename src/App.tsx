@@ -10,6 +10,7 @@ import CheckboxTest from '@/pages/CheckboxTest'
 import Courses from '@/pages/academic/Courses'
 import CourseDetail from '@/pages/academic/CourseDetail'
 import Students from '@/pages/academic/Students'
+import Classes from '@/pages/academic/Classes'
 import PlaceholderPage from '@/components/PlaceholderPage'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -74,12 +75,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <Layout>
-                  <PlaceholderPage
-                    title="班级管理"
-                    description="管理班级信息、班级成员和教学安排"
-                    icon="👥"
-                    features={["班级创建", "成员管理", "课程安排", "班级统计"]}
-                  />
+                  <Classes />
                 </Layout>
               </ProtectedRoute>
             }
