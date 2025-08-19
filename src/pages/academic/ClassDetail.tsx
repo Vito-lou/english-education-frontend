@@ -10,6 +10,7 @@ import { classApi } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import ClassEditor from '@/components/academic/ClassEditor';
 import ClassStudentManagement from '@/components/academic/ClassStudentManagement';
+import ClassScheduleManagement from '@/components/academic/ClassScheduleManagement';
 
 const ClassDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -178,11 +179,7 @@ const ClassDetail: React.FC = () => {
 
             <div className="p-6">
               <TabsContent value="schedule" className="mt-0">
-                <div className="text-center py-12 text-gray-500">
-                  <Calendar className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                  <h3 className="text-lg font-medium mb-2">排课信息</h3>
-                  <p>排课功能开发中...</p>
-                </div>
+                <ClassScheduleManagement classId={parseInt(id!)} classInfo={classInfo} />
               </TabsContent>
 
               <TabsContent value="students" className="mt-0">

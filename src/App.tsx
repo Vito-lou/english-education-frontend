@@ -12,6 +12,7 @@ import CourseDetail from '@/pages/academic/CourseDetail'
 import Students from '@/pages/academic/Students'
 import Classes from '@/pages/academic/Classes'
 import ClassDetail from '@/pages/academic/ClassDetail'
+import TimeSlots from '@/pages/academic/TimeSlots'
 import PlaceholderPage from '@/components/PlaceholderPage'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -96,12 +97,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <Layout>
-                  <PlaceholderPage
-                    title="课表管理"
-                    description="制定和管理课程时间表"
-                    icon="📅"
-                    features={["课表制定", "教室安排", "教师排课", "冲突检测"]}
-                  />
+                  <TimeSlots />
                 </Layout>
               </ProtectedRoute>
             }
