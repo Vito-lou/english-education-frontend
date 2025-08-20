@@ -28,8 +28,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Plus, Trash2, Settings } from 'lucide-react';
 import { useToast } from '@/components/ui/toast';
-import { useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
+import TimeSlotSettings from './TimeSlotSettings';
+import CalendarMultiSelect from '@/components/ui/calendar-multi-select';
 
 interface ClassScheduleManagementProps {
   classId: number;
@@ -78,9 +79,9 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
-  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [timeSlotSettingsOpen, setTimeSlotSettingsOpen] = useState(false);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const { addToast } = useToast();
-  const navigate = useNavigate();
 
   // 批量排课表单数据
   const [batchForm, setBatchForm] = useState({
@@ -131,6 +132,11 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
     fetchBasicData();
   }, [classId]);
 
+  // 时间段更新后的回调
+  const handleTimeSlotUpdated = () => {
+    fetchBasicData(); // 重新获取时间段数据
+  };
+
   // 打开一键排课对话框
   const handleBatchSchedule = () => {
     setBatchForm({
@@ -144,45 +150,56 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
     setBatchDialogOpen(true);
   };
 
-  // 生成未来30天的日期选项
-  const generateDateOptions = () => {
-    const dates = [];
-    const today = new Date();
-    for (let i = 1; i <= 30; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      dates.push(date.toISOString().split('T')[0]);
-    }
-    return dates;
-  };
-
   // 处理日期选择
-  const handleDateToggle = (date: string) => {
-    setSelectedDates(prev =>
-      prev.includes(date)
-        ? prev.filter(d => d !== date)
-        : [...prev, date]
-    );
+  const handleDatesChange = (dates: Date[]) => {
+    setSelectedDates(dates);
   };
 
   // 提交批量排课
   const handleBatchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // 前端表单验证
+    const errors = [];
+
+    if (!batchForm.course_id) {
+      errors.push('请选择授课课程');
+    }
+
+    if (!batchForm.teacher_id) {
+      errors.push('请选择授课教师');
+    }
+
+    if (!batchForm.time_slot_id) {
+      errors.push('请选择上课时间');
+    }
+
     if (selectedDates.length === 0) {
+      errors.push('请至少选择一个上课日期');
+    }
+
+    if (errors.length > 0) {
       addToast({
         type: 'error',
-        title: '请选择日期',
-        description: '至少选择一个上课日期',
+        title: '表单验证失败',
+        description: errors.join('、'),
       });
       return;
     }
 
     try {
+      // 将Date对象转换为字符串格式（避免时区问题）
+      const dateStrings = selectedDates.map(date => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      });
+
       await api.post('/admin/schedules/batch-create', {
         class_id: classId,
         ...batchForm,
-        dates: selectedDates,
+        dates: dateStrings,
       });
 
       addToast({
@@ -204,10 +221,6 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
 
   // 删除排课
   const handleDelete = async (schedule: ClassSchedule) => {
-    if (!confirm(`确定要删除 ${schedule.schedule_date} 的课程安排吗？`)) {
-      return;
-    }
-
     try {
       await api.delete(`/admin/class-schedules/${schedule.id}`);
 
@@ -245,10 +258,6 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
           <p className="text-sm text-muted-foreground">管理 {classInfo.name} 的课程安排</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => navigate('/academic/schedules')}>
-            <Settings className="mr-2 h-4 w-4" />
-            时间段设置
-          </Button>
           <Button onClick={handleBatchSchedule} size="sm">
             <Calendar className="mr-2 h-4 w-4" />
             一键排课
@@ -342,7 +351,10 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>授课课程</Label>
+                  <Label>
+                    授课课程
+                    <span className="text-red-500 ml-1">*</span>
+                  </Label>
                   <Select value={batchForm.course_id} onValueChange={(value) => setBatchForm({ ...batchForm, course_id: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="选择课程" />
@@ -357,7 +369,10 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>授课教师</Label>
+                  <Label>
+                    授课教师
+                    <span className="text-red-500 ml-1">*</span>
+                  </Label>
                   <Select value={batchForm.teacher_id} onValueChange={(value) => setBatchForm({ ...batchForm, teacher_id: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="选择教师" />
@@ -375,7 +390,22 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>上课时间</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>
+                      上课时间
+                      <span className="text-red-500 ml-1">*</span>
+                    </Label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTimeSlotSettingsOpen(true)}
+                      className="text-xs h-7 px-3 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300"
+                    >
+                      <Settings className="mr-1 h-3 w-3" />
+                      时间段设置
+                    </Button>
+                  </div>
                   <Select value={batchForm.time_slot_id} onValueChange={(value) => setBatchForm({ ...batchForm, time_slot_id: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="选择时间段" />
@@ -410,24 +440,17 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
               </div>
 
               <div className="space-y-2">
-                <Label>选择日期（可多选）</Label>
-                <div className="grid grid-cols-7 gap-2 max-h-40 overflow-y-auto border rounded p-2">
-                  {generateDateOptions().map((date) => (
-                    <Button
-                      key={date}
-                      type="button"
-                      variant={selectedDates.includes(date) ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => handleDateToggle(date)}
-                      className="text-xs h-8"
-                    >
-                      {new Date(date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
-                    </Button>
-                  ))}
+                <Label>
+                  选择日期（可多选）
+                  <span className="text-red-500 ml-1">*</span>
+                </Label>
+                <div className="border rounded-lg">
+                  <CalendarMultiSelect
+                    selectedDates={selectedDates}
+                    onDatesChange={handleDatesChange}
+                    className="w-full"
+                  />
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  已选择 {selectedDates.length} 个日期
-                </p>
               </div>
             </div>
             <DialogFooter>
@@ -441,6 +464,13 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* 时间段设置对话框 */}
+      <TimeSlotSettings
+        open={timeSlotSettingsOpen}
+        onClose={() => setTimeSlotSettingsOpen(false)}
+        onTimeSlotUpdated={handleTimeSlotUpdated}
+      />
     </div>
   );
 };

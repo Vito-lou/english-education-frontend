@@ -12,7 +12,7 @@ import CourseDetail from '@/pages/academic/CourseDetail'
 import Students from '@/pages/academic/Students'
 import Classes from '@/pages/academic/Classes'
 import ClassDetail from '@/pages/academic/ClassDetail'
-import TimeSlots from '@/pages/academic/TimeSlots'
+
 import PlaceholderPage from '@/components/PlaceholderPage'
 import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
@@ -92,16 +92,7 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/academic/schedules"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <TimeSlots />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
+
           <Route
             path="/academic/teachers"
             element={

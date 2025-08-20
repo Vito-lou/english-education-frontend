@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, UserPlus } from 'lucide-react';
+import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,28 +40,7 @@ interface Student {
   created_at: string;
 }
 
-interface StudentStats {
-  total: number;
-  by_type: {
-    potential: number;
-    trial: number;
-    enrolled: number;
-    graduated: number;
-    suspended: number;
-  };
-  by_follow_up: {
-    new: number;
-    contacted: number;
-    interested: number;
-    not_interested: number;
-    follow_up: number;
-  };
-  by_intention: {
-    high: number;
-    medium: number;
-    low: number;
-  };
-}
+
 
 const Students: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -83,7 +62,7 @@ const Students: React.FC = () => {
     queryFn: async () => {
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        per_page: '2', // 临时改为2条每页，方便测试分页
+        per_page: '10', // 每页10条数据
       });
 
       if (search) params.append('search', search);
@@ -96,14 +75,7 @@ const Students: React.FC = () => {
     },
   });
 
-  // 获取统计信息
-  const { data: statsData } = useQuery({
-    queryKey: ['students-statistics'],
-    queryFn: async () => {
-      const response = await api.get('/admin/students/statistics');
-      return response.data;
-    },
-  });
+
 
   // 删除学员
   const deleteMutation = useMutation({
@@ -112,7 +84,6 @@ const Students: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
-      queryClient.invalidateQueries({ queryKey: ['students-statistics'] });
       setShowConfirmDialog(false);
       setStudentToDelete(null);
       addToast({
@@ -147,12 +118,7 @@ const Students: React.FC = () => {
   console.log('pagination:', pagination);
   console.log('students length:', students.length);
 
-  const stats: StudentStats = statsData?.data || {
-    total: 0,
-    by_type: { potential: 0, trial: 0, enrolled: 0, graduated: 0, suspended: 0 },
-    by_follow_up: { new: 0, contacted: 0, interested: 0, not_interested: 0, follow_up: 0 },
-    by_intention: { high: 0, medium: 0, low: 0 },
-  };
+
 
   const handleCreateStudent = () => {
     setEditingStudent(null);
@@ -228,48 +194,7 @@ const Students: React.FC = () => {
         <p className="text-muted-foreground">管理学员信息、跟进状态和学习进度</p>
       </div>
 
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">总学员数</CardTitle>
-            <UserPlus className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">正式学员</CardTitle>
-            <UserPlus className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.by_type.enrolled}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">试听学员</CardTitle>
-            <UserPlus className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{stats.by_type.trial}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">潜在学员</CardTitle>
-            <UserPlus className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.by_type.potential}</div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* 筛选和搜索 */}
       <Card>
