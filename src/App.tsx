@@ -10,6 +10,8 @@ import CheckboxTest from '@/pages/CheckboxTest'
 import Courses from '@/pages/academic/Courses'
 import CourseDetail from '@/pages/academic/CourseDetail'
 import Students from '@/pages/academic/Students'
+import StudentDetail from '@/pages/academic/StudentDetail'
+import Orders from '@/pages/finance/Orders'
 import Classes from '@/pages/academic/Classes'
 import ClassDetail from '@/pages/academic/ClassDetail'
 
@@ -73,6 +75,16 @@ function App() {
             }
           />
           <Route
+            path="/academic/students/:id"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <StudentDetail />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/academic/classes"
             element={
               <ProtectedRoute>
@@ -108,6 +120,19 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* 财务中心路由 */}
+          <Route
+            path="/finance/orders"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Orders />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/academic/courses"
             element={

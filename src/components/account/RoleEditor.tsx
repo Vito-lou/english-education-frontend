@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import MenuPermissionSelector from './MenuPermissionSelector';
 import DataPermissionGroup from './DataPermissionGroup';
 import { Save, X } from 'lucide-react';
+import { useAuthStore } from '@/stores/auth';
 
 interface Role {
   id: number;
@@ -86,6 +87,7 @@ const RoleEditor: React.FC<RoleEditorProps> = ({
   isCreating,
   isSaving,
 }) => {
+  const { user } = useAuthStore();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -165,7 +167,8 @@ const RoleEditor: React.FC<RoleEditorProps> = ({
   };
 
   const isSystemRole = role?.is_system || false;
-  const isReadonly = isSystemRole && !isCreating;
+  // 系统角色只读，但超级管理员可以编辑（后端会进行权限验证）
+  const isReadonly = false; // 移除前端限制，让后端处理权限控制
 
   return (
     <div className="h-full flex flex-col">
@@ -221,7 +224,7 @@ const RoleEditor: React.FC<RoleEditorProps> = ({
                   menus={menus}
                   selectedIds={selectedMenuIds}
                   onChange={handleMenuChange}
-                  disabled={isSystemRole}
+                  disabled={isReadonly}
                 />
               </div>
             </div>

@@ -31,12 +31,14 @@ interface StudentEditorProps {
   open: boolean;
   onClose: () => void;
   student?: Student | null;
+  onSuccess?: () => void;
 }
 
 const StudentEditor: React.FC<StudentEditorProps> = ({
   open,
   onClose,
   student,
+  onSuccess,
 }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -80,6 +82,8 @@ const StudentEditor: React.FC<StudentEditorProps> = ({
         title: student ? '更新成功' : '创建成功',
         description: student ? '学员信息已更新' : '学员已创建',
       });
+      // 调用外部传入的成功回调
+      onSuccess?.();
     },
     onError: (error: any) => {
       addToast({

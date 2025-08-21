@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +56,7 @@ const Students: React.FC = () => {
 
   const { addToast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // 获取学员列表
   const { data: studentsData, isLoading } = useQuery({
@@ -119,6 +121,12 @@ const Students: React.FC = () => {
   console.log('students length:', students.length);
 
 
+
+  // 处理详情页跳转
+  const handleDetail = (student: Student, tab?: string) => {
+    const url = `/academic/students/${student.id}${tab ? `?tab=${tab}` : ''}`;
+    navigate(url);
+  };
 
   const handleCreateStudent = () => {
     setEditingStudent(null);
@@ -301,7 +309,12 @@ const Students: React.FC = () => {
                       <TableRow key={student.id}>
                         <TableCell className="font-medium">
                           <div>
-                            <div>{student.name}</div>
+                            <button
+                              onClick={() => handleDetail(student)}
+                              className="font-medium text-blue-600 hover:text-blue-800 hover:underline text-left"
+                            >
+                              {student.name}
+                            </button>
                             {student.age && (
                               <div className="text-sm text-gray-500">{student.age}岁</div>
                             )}

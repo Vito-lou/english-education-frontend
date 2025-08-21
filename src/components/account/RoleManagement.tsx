@@ -54,7 +54,7 @@ const RoleManagement: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const { toast } = useToast();
+  const { addToast } = useToast();
   const queryClient = useQueryClient();
 
   // 获取当前用户信息
@@ -125,16 +125,17 @@ const RoleManagement: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       setHasUnsavedChanges(false);
-      toast({
+      addToast({
+        type: 'success',
         title: '保存成功',
         description: '角色权限已更新',
       });
     },
     onError: (error: any) => {
-      toast({
+      addToast({
+        type: 'error',
         title: '保存失败',
         description: error.response?.data?.message || '保存角色权限时发生错误',
-        variant: 'destructive',
       });
     },
   });
@@ -158,16 +159,17 @@ const RoleManagement: React.FC = () => {
       setSelectedRoleId(data.data.id);
       setIsCreating(false);
       setHasUnsavedChanges(false);
-      toast({
+      addToast({
+        type: 'success',
         title: '创建成功',
         description: '新角色已创建',
       });
     },
     onError: (error: any) => {
-      toast({
+      addToast({
+        type: 'error',
         title: '创建失败',
         description: error.response?.data?.message || '创建角色时发生错误',
-        variant: 'destructive',
       });
     },
   });
@@ -223,10 +225,10 @@ const RoleManagement: React.FC = () => {
       const institutionId = currentUser?.institution_id;
 
       if (!institutionId) {
-        toast({
+        addToast({
+          type: 'error',
           title: '创建失败',
           description: '无法获取当前用户的机构信息',
-          variant: 'destructive',
         });
         return;
       }
@@ -269,16 +271,17 @@ const RoleManagement: React.FC = () => {
         setSelectedRole(null);
       }
       setHasUnsavedChanges(false);
-      toast({
+      addToast({
+        type: 'success',
         title: '删除成功',
         description: '角色已删除',
       });
     },
     onError: (error: any) => {
-      toast({
+      addToast({
+        type: 'error',
         title: '删除失败',
         description: error.response?.data?.message || '删除角色时发生错误',
-        variant: 'destructive',
       });
     },
   });
