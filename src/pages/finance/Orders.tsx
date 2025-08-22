@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
+import { CacheUtils } from '@/utils/cacheUtils';
 
 interface Enrollment {
   id: number;
@@ -123,13 +124,15 @@ const Orders: React.FC = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['enrollments'] });
+      // 使用缓存工具函数刷新所有相关缓存
+      CacheUtils.refreshAfterRefund(queryClient);
+
       setRefundDialogOpen(false);
       setSelectedOrder(null);
       addToast({
         type: 'success',
         title: '退费成功',
-        description: '订单已退费',
+        description: '订单已退费，相关状态已更新',
       });
     },
     onError: (error: any) => {
@@ -250,7 +253,7 @@ const Orders: React.FC = () => {
                       <TableRow key={order.id}>
                         <TableCell>
                           <div>
-                            <div className="font-medium">#{order.id}</div>
+                            <div className="font-medium">{order.order_number || `#${order.id}`}</div>
                             <div className="text-sm text-gray-500">{order.campus.name}</div>
                           </div>
                         </TableCell>
@@ -386,7 +389,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>订单详情 - #{order.id}</DialogTitle>
+          <DialogTitle>订单详情 - {order.order_number || `#${order.id}`}</DialogTitle>
           <DialogDescription>
             查看订单的详细信息。
           </DialogDescription>
@@ -441,6 +444,20 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
   );
 };
 
+// 退费信息接口
+interface RefundInfo {
+  enrollment_id: number;
+  student_name: string;
+  course_name: string;
+  original_amount: number;
+  price_per_lesson: number;
+  total_lessons: number;
+  attended_lessons: number;
+  consumed_amount: number;
+  suggested_refund_amount: number;
+  max_refund_amount: number;
+}
+
 // 退费对话框组件
 interface RefundDialogProps {
   isOpen: boolean;
@@ -453,21 +470,46 @@ interface RefundDialogProps {
 const RefundDialog: React.FC<RefundDialogProps> = ({ isOpen, onClose, order, onSubmit, isSubmitting }) => {
   const [refundAmount, setRefundAmount] = useState<string>('');
   const [refundReason, setRefundReason] = useState<string>('');
+  const [refundInfo, setRefundInfo] = useState<RefundInfo | null>(null);
+  const [isLoadingRefundInfo, setIsLoadingRefundInfo] = useState(false);
 
+  // 获取退费信息
   React.useEffect(() => {
-    if (order) {
-      setRefundAmount(order.actual_amount.toString());
-      setRefundReason('');
-    } else {
+    if (order && isOpen) {
+      setIsLoadingRefundInfo(true);
+      api.get(`/admin/enrollments/${order.id}/refund-info`)
+        .then(response => {
+          const info = response.data.data;
+          setRefundInfo(info);
+          setRefundAmount(info.suggested_refund_amount.toString());
+          setRefundReason('');
+        })
+        .catch(error => {
+          console.error('获取退费信息失败:', error);
+          // 如果获取失败，使用原来的逻辑
+          setRefundAmount(order.actual_amount.toString());
+          setRefundReason('');
+        })
+        .finally(() => {
+          setIsLoadingRefundInfo(false);
+        });
+    } else if (!order) {
       setRefundAmount('');
       setRefundReason('');
+      setRefundInfo(null);
     }
-  }, [order]);
+  }, [order, isOpen]);
 
   const handleSubmit = () => {
     const amount = parseFloat(refundAmount);
+    const maxAmount = refundInfo?.max_refund_amount || order?.actual_amount || 0;
+
     if (!amount || amount <= 0) {
       alert('请输入有效的退费金额');
+      return;
+    }
+    if (amount > maxAmount) {
+      alert(`退费金额不能超过订单实收金额 ¥${maxAmount}`);
       return;
     }
     if (!refundReason.trim()) {
@@ -481,39 +523,97 @@ const RefundDialog: React.FC<RefundDialogProps> = ({ isOpen, onClose, order, onS
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>申请退费</DialogTitle>
           <DialogDescription>
-            正在为学员 "{order.student.name}" 的订单 #{order.id} 办理退费。
-            订单实收金额为 ¥{order.actual_amount}。
+            正在为学员 "{order.student.name}" 的订单 {order.order_number || `#${order.id}`} 办理退费
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="refundAmount" className="text-right">
-              退费金额
-            </Label>
-            <Input
-              id="refundAmount"
-              type="number"
-              value={refundAmount}
-              onChange={(e) => setRefundAmount(e.target.value)}
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="refundReason" className="text-right">
-              退费原因
-            </Label>
 
-            <Textarea
-              id="refundReason"
-              value={refundReason}
-              onChange={(e) => setRefundReason(e.target.value)}
-              className="col-span-3"
-              placeholder="请输入详细的退费原因"
-            />
+        <div className="space-y-6">
+          {/* 退费计算明细 */}
+          {isLoadingRefundInfo ? (
+            <div className="text-center py-4">
+              <div className="text-sm text-gray-500">正在计算退费金额...</div>
+            </div>
+          ) : refundInfo ? (
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium mb-3">退费计算明细</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">订单原金额:</span>
+                    <span className="font-medium">¥{refundInfo.original_amount}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">课时单价:</span>
+                    <span>¥{refundInfo.price_per_lesson}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">总课时数:</span>
+                    <span>{refundInfo.total_lessons} 节</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">已消课时:</span>
+                    <span className="text-orange-600 font-medium">{refundInfo.attended_lessons} 节</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">消课金额:</span>
+                    <span className="text-red-600 font-medium">-¥{refundInfo.consumed_amount}</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-gray-600 font-medium">建议退费:</span>
+                    <span className="text-green-600 font-bold">¥{refundInfo.suggested_refund_amount}</span>
+                  </div>
+                </div>
+              </div>
+              {refundInfo.attended_lessons > 0 && (
+                <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                  <strong>说明:</strong> 已根据学员的 {refundInfo.attended_lessons} 节出席记录计算消课金额，建议退费金额已扣除相应费用。管理员可根据实际情况调整退费金额。
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {/* 退费金额输入 */}
+          <div className="grid gap-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="refundAmount" className="text-right">
+                退费金额 <span className="text-red-500">*</span>
+              </Label>
+              <div className="col-span-3">
+                <Input
+                  id="refundAmount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max={refundInfo?.max_refund_amount || order.actual_amount}
+                  value={refundAmount}
+                  onChange={(e) => setRefundAmount(e.target.value)}
+                  placeholder="请输入退费金额"
+                />
+                <div className="text-xs text-gray-500 mt-1">
+                  最大可退费金额: ¥{refundInfo?.max_refund_amount || order.actual_amount}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="refundReason" className="text-right pt-2">
+                退费原因 <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                id="refundReason"
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                className="col-span-3"
+                placeholder="请详细说明退费原因，如学员个人原因、课程质量问题等"
+                rows={3}
+              />
+            </div>
           </div>
         </div>
         <DialogFooter>

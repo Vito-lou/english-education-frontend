@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,6 +61,15 @@ const StudentEditor: React.FC<StudentEditorProps> = ({
 
   const { addToast } = useToast();
   const queryClient = useQueryClient();
+
+  // 获取可创建的学员类型
+  const { data: creatableTypesData } = useQuery({
+    queryKey: ['student-creatable-types'],
+    queryFn: async () => {
+      const response = await api.get('/admin/students/creatable-types');
+      return response.data.data;
+    },
+  });
 
   // 保存学员
   const saveMutation = useMutation({
@@ -305,18 +314,44 @@ const StudentEditor: React.FC<StudentEditorProps> = ({
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="student_type">学员类型</Label>
+                {!student && (
+                  <p className="text-xs text-gray-500 mt-1 mb-2">
+                    注：正式学员状态需通过报名获得
+                  </p>
+                )}
                 <Select value={formData.student_type} onValueChange={(value) => handleInputChange('student_type', value)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="potential">潜在学员</SelectItem>
-                    <SelectItem value="trial">试听学员</SelectItem>
-                    <SelectItem value="enrolled">正式学员</SelectItem>
-                    <SelectItem value="graduated">已毕业</SelectItem>
-                    <SelectItem value="suspended">暂停学习</SelectItem>
+                    {!student ? (
+                      // 新增学员时只显示可创建的类型
+                      creatableTypesData ? Object.entries(creatableTypesData).map(([key, value]) => (
+                        <SelectItem key={key} value={key}>{value as string}</SelectItem>
+                      )) : (
+                        <>
+                          <SelectItem value="potential">潜在学员</SelectItem>
+                          <SelectItem value="trial">试听学员</SelectItem>
+                        </>
+                      )
+                    ) : (
+                      // 编辑学员时显示所有类型，但有特殊处理
+                      <>
+                        <SelectItem value="potential">潜在学员</SelectItem>
+                        <SelectItem value="trial">试听学员</SelectItem>
+                        <SelectItem value="enrolled">正式学员</SelectItem>
+                        <SelectItem value="refunded">已退费学员</SelectItem>
+                        <SelectItem value="graduated">已毕业</SelectItem>
+                        <SelectItem value="suspended">暂停学习</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
+                {student && formData.student_type === 'enrolled' && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    正式学员状态由报名流程自动设置，请勿手动修改
+                  </p>
+                )}
               </div>
 
               <div>

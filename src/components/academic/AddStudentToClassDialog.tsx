@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -43,7 +43,7 @@ const AddStudentToClassDialog: React.FC<AddStudentToClassDialogProps> = ({
   const queryClient = useQueryClient();
 
   // 获取可添加的学员列表（排除已在班级中的学员）
-  const { data: studentsData, isLoading } = useQuery({
+  const { data: studentsData, isLoading, refetch } = useQuery({
     queryKey: ['available-students', classId, search],
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -58,8 +58,17 @@ const AddStudentToClassDialog: React.FC<AddStudentToClassDialogProps> = ({
       const response = await api.get(`/admin/students?${params}`);
       return response.data;
     },
-    enabled: open,
+    enabled: open, // 只有在弹窗打开时才执行查询
+    refetchOnWindowFocus: false,
+    staleTime: 0, // 数据立即过期，确保每次打开都获取最新数据
   });
+
+  // 当弹窗打开时，重新获取最新的学员数据
+  useEffect(() => {
+    if (open) {
+      refetch();
+    }
+  }, [open, refetch]);
 
   // 添加学员到班级
   const addStudentsMutation = useMutation({
@@ -170,8 +179,16 @@ const AddStudentToClassDialog: React.FC<AddStudentToClassDialogProps> = ({
                 <div className="text-6xl mb-4">👥</div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">暂无可添加的学员</h3>
                 <p className="text-gray-500">
-                  {search ? '没有找到匹配的学员' : '所有正式学员都已在班级中'}
+                  {search
+                    ? '没有找到匹配的正式学员'
+                    : '所有正式学员都已在班级中，或没有该课程的有效报名记录'
+                  }
                 </p>
+                {!search && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    提示：只有正式学员且有对应课程报名记录的学员才能加入班级
+                  </p>
+                )}
               </div>
             ) : (
               <Table>

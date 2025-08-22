@@ -11,7 +11,10 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 0, // 数据立即过期，确保实时性
+      cacheTime: 0, // 不缓存数据
+      refetchOnMount: true, // 组件挂载时重新获取
+      refetchOnReconnect: true, // 网络重连时重新获取
     },
   },
 })

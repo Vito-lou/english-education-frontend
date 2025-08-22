@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,15 +27,43 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Plus, Trash2, Settings } from 'lucide-react';
+import { Calendar, Plus, Trash2, Settings, UserCheck, Edit } from 'lucide-react';
+import { CacheUtils } from '@/utils/cacheUtils';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import TimeSlotSettings from './TimeSlotSettings';
 import CalendarMultiSelect from '@/components/ui/calendar-multi-select';
+import ClassAttendanceDialog from './ClassAttendanceDialog';
+
+// 状态徽章组件
+const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const getStatusConfig = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return { text: '未点名', variant: 'destructive' as const };
+      case 'completed':
+        return { text: '已点名', variant: 'default' as const };
+      case 'cancelled':
+        return { text: '已取消', variant: 'secondary' as const };
+      default:
+        return { text: status, variant: 'outline' as const };
+    }
+  };
+
+  const config = getStatusConfig(status);
+  return <Badge variant={config.variant}>{config.text}</Badge>;
+};
+
+interface ClassInfo {
+  id: number;
+  name: string;
+  course_id?: number;
+  teacher_id?: number;
+}
 
 interface ClassScheduleManagementProps {
   classId: number;
-  classInfo: any;
+  classInfo: ClassInfo;
 }
 
 interface ClassSchedule {
@@ -73,15 +102,49 @@ interface TimeSlot {
 }
 
 const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ classId, classInfo }) => {
-  const [schedules, setSchedules] = useState<ClassSchedule[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [batchDialogOpen, setBatchDialogOpen] = useState(false);
   const [timeSlotSettingsOpen, setTimeSlotSettingsOpen] = useState(false);
+  const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState<ClassSchedule | null>(null);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const { addToast } = useToast();
+
+  // 获取班级排课列表
+  const { data: schedules = [], isLoading } = useQuery({
+    queryKey: ['class-schedules', classId],
+    queryFn: async () => {
+      const response = await api.get(`/admin/class-schedules?class_id=${classId}`);
+      return response.data.data || [];
+    },
+  });
+
+  // 获取课程列表
+  const { data: courses = [], isLoading: coursesLoading } = useQuery({
+    queryKey: ['courses-options'],
+    queryFn: async () => {
+      const response = await api.get('/admin/courses-options');
+      return response.data.data || [];
+    },
+  });
+
+  // 获取教师列表
+  const { data: teachers = [], isLoading: teachersLoading } = useQuery({
+    queryKey: ['teachers-options'],
+    queryFn: async () => {
+      const response = await api.get('/admin/users-options?role=teacher');
+      return response.data.data || [];
+    },
+  });
+
+  // 获取时间段列表
+  const { data: timeSlots = [], isLoading: timeSlotsLoading } = useQuery({
+    queryKey: ['time-slots'],
+    queryFn: async () => {
+      const response = await api.get('/admin/time-slots');
+      return response.data.data || [];
+    },
+  });
 
   // 批量排课表单数据
   const [batchForm, setBatchForm] = useState({
@@ -92,49 +155,58 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
     classroom: '',
   });
 
-  // 获取班级排课列表
-  const fetchSchedules = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/admin/class-schedules?class_id=${classId}`);
-      setSchedules(response.data.data || []);
-    } catch (error) {
-      console.error('获取排课失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // 批量排课 mutation
+  const batchScheduleMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return api.post('/admin/schedules/batch-create', data);
+    },
+    onSuccess: () => {
+      addToast({
+        type: 'success',
+        title: '排课成功',
+        description: `成功创建 ${selectedDates.length} 个课程安排`,
+      });
+      setBatchDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['class-schedules', classId] });
+    },
+    onError: (error: any) => {
+      console.error('批量排课失败:', error);
+      const description = error?.response?.data?.message || '网络错误，请稍后重试';
+      addToast({
+        type: 'error',
+        title: '排课失败',
+        description,
+      });
+    },
+  });
 
-  // 获取基础数据
-  const fetchBasicData = async () => {
-    try {
-      const [coursesRes, teachersRes, timeSlotsRes] = await Promise.all([
-        api.get('/admin/courses-options'),
-        api.get('/admin/users-options?role=teacher'),
-        api.get('/admin/time-slots'),
-      ]);
-
-      console.log('Courses data:', coursesRes.data);
-      setCourses(coursesRes.data.data || []);
-
-      console.log('Teachers data:', teachersRes.data);
-      setTeachers(teachersRes.data.data || []);
-
-      console.log('Time slots data:', timeSlotsRes.data);
-      setTimeSlots(timeSlotsRes.data.data || []);
-    } catch (error) {
-      console.error('获取基础数据失败:', error);
-    }
-  };
-
-  useEffect(() => {
-    fetchSchedules();
-    fetchBasicData();
-  }, [classId]);
+  // 删除排课 mutation
+  const deleteScheduleMutation = useMutation({
+    mutationFn: async (scheduleId: number) => {
+      return api.delete(`/admin/class-schedules/${scheduleId}`);
+    },
+    onSuccess: () => {
+      addToast({
+        type: 'success',
+        title: '删除成功',
+        description: '课程安排已删除',
+      });
+      queryClient.invalidateQueries({ queryKey: ['class-schedules', classId] });
+    },
+    onError: (error: any) => {
+      console.error('删除失败:', error);
+      const description = error?.response?.data?.message || '网络错误，请稍后重试';
+      addToast({
+        type: 'error',
+        title: '删除失败',
+        description,
+      });
+    },
+  });
 
   // 时间段更新后的回调
   const handleTimeSlotUpdated = () => {
-    fetchBasicData(); // 重新获取时间段数据
+    queryClient.invalidateQueries({ queryKey: ['time-slots'] });
   };
 
   // 打开一键排课对话框
@@ -148,6 +220,12 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
     });
     setSelectedDates([]);
     setBatchDialogOpen(true);
+  };
+
+  // 打开点名对话框
+  const handleAttendance = (schedule: ClassSchedule) => {
+    setSelectedSchedule(schedule);
+    setAttendanceDialogOpen(true);
   };
 
   // 处理日期选择
@@ -187,68 +265,27 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
       return;
     }
 
-    try {
-      // 将Date对象转换为字符串格式（避免时区问题）
-      const dateStrings = selectedDates.map(date => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      });
+    // 将Date对象转换为字符串格式（避免时区问题）
+    const dateStrings = selectedDates.map(date => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    });
 
-      await api.post('/admin/schedules/batch-create', {
-        class_id: classId,
-        ...batchForm,
-        dates: dateStrings,
-      });
-
-      addToast({
-        type: 'success',
-        title: '排课成功',
-        description: `成功创建 ${selectedDates.length} 个课程安排`,
-      });
-      setBatchDialogOpen(false);
-      fetchSchedules();
-    } catch (error) {
-      console.error('批量排课失败:', error);
-      addToast({
-        type: 'error',
-        title: '排课失败',
-        description: error.response?.data?.message || '网络错误，请稍后重试',
-      });
-    }
+    batchScheduleMutation.mutate({
+      class_id: classId,
+      ...batchForm,
+      dates: dateStrings,
+    });
   };
 
   // 删除排课
-  const handleDelete = async (schedule: ClassSchedule) => {
-    try {
-      await api.delete(`/admin/class-schedules/${schedule.id}`);
-
-      addToast({
-        type: 'success',
-        title: '删除成功',
-        description: '课程安排已删除',
-      });
-      fetchSchedules();
-    } catch (error: any) {
-      console.error('删除失败:', error);
-      addToast({
-        type: 'error',
-        title: '删除失败',
-        description: error.response?.data?.message || '网络错误，请稍后重试',
-      });
-    }
+  const handleDelete = (schedule: ClassSchedule) => {
+    deleteScheduleMutation.mutate(schedule.id);
   };
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'scheduled': return 'default';
-      case 'completed': return 'secondary';
-      case 'cancelled': return 'destructive';
-      case 'rescheduled': return 'outline';
-      default: return 'default';
-    }
-  };
+
 
   return (
     <div className="space-y-6">
@@ -281,7 +318,7 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? (
+            {isLoading ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8">
                   加载中...
@@ -318,18 +355,50 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
                   <TableCell>{schedule.classroom || '-'}</TableCell>
                   <TableCell>{schedule.lesson_content || '-'}</TableCell>
                   <TableCell>
-                    <Badge variant={getStatusBadgeVariant(schedule.status)}>
-                      {schedule.status_name}
-                    </Badge>
+                    <StatusBadge status={schedule.status} />
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(schedule)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center justify-end space-x-2">
+                      {/* 点名按钮 - 根据状态和日期显示不同的按钮 */}
+                      {schedule.status === 'scheduled' && new Date(schedule.schedule_date) <= new Date() ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAttendance(schedule)}
+                        >
+                          <UserCheck className="mr-2 h-4 w-4" />
+                          点名
+                        </Button>
+                      ) : schedule.status === 'completed' ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleAttendance(schedule)}
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          修改点名
+                        </Button>
+                      ) : schedule.status === 'scheduled' ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled
+                        >
+                          <UserCheck className="mr-2 h-4 w-4" />
+                          未开始
+                        </Button>
+                      ) : null}
+                      {/* 删除按钮 - 已点名的排课不能删除 */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(schedule)}
+                        disabled={schedule.status === 'completed'}
+                        title={schedule.status === 'completed' ? '已点名的排课不能删除' : '删除排课'}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -360,11 +429,17 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
                       <SelectValue placeholder="选择课程" />
                     </SelectTrigger>
                     <SelectContent>
-                      {courses.map((course) => (
-                        <SelectItem key={course.id} value={course.id.toString()}>
-                          {course.name}
-                        </SelectItem>
-                      ))}
+                      {coursesLoading ? (
+                        <SelectItem value="" disabled>加载中...</SelectItem>
+                      ) : Array.isArray(courses) ? (
+                        courses.map((course: any) => (
+                          <SelectItem key={course.id} value={course.id.toString()}>
+                            {course.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>暂无课程</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -378,11 +453,17 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
                       <SelectValue placeholder="选择教师" />
                     </SelectTrigger>
                     <SelectContent>
-                      {teachers.map((teacher) => (
-                        <SelectItem key={teacher.id} value={teacher.id.toString()}>
-                          {teacher.name}
-                        </SelectItem>
-                      ))}
+                      {teachersLoading ? (
+                        <SelectItem value="" disabled>加载中...</SelectItem>
+                      ) : Array.isArray(teachers) ? (
+                        teachers.map((teacher: any) => (
+                          <SelectItem key={teacher.id} value={teacher.id.toString()}>
+                            {teacher.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>暂无教师</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -411,11 +492,17 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
                       <SelectValue placeholder="选择时间段" />
                     </SelectTrigger>
                     <SelectContent>
-                      {timeSlots.map((slot) => (
-                        <SelectItem key={slot.id} value={slot.id.toString()}>
-                          {slot.display_name}
-                        </SelectItem>
-                      ))}
+                      {timeSlotsLoading ? (
+                        <SelectItem value="" disabled>加载中...</SelectItem>
+                      ) : Array.isArray(timeSlots) ? (
+                        timeSlots.map((slot: any) => (
+                          <SelectItem key={slot.id} value={slot.id.toString()}>
+                            {slot.display_name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>暂无时间段</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -471,6 +558,20 @@ const ClassScheduleManagement: React.FC<ClassScheduleManagementProps> = ({ class
         onClose={() => setTimeSlotSettingsOpen(false)}
         onTimeSlotUpdated={handleTimeSlotUpdated}
       />
+
+      {/* 点名对话框 */}
+      {selectedSchedule && (
+        <ClassAttendanceDialog
+          open={attendanceDialogOpen}
+          onClose={() => setAttendanceDialogOpen(false)}
+          schedule={selectedSchedule}
+          onAttendanceSaved={() => {
+            setAttendanceDialogOpen(false);
+            // 使用缓存工具函数刷新点名相关缓存
+            CacheUtils.refreshAfterAttendance(queryClient, classId);
+          }}
+        />
+      )}
     </div>
   );
 };

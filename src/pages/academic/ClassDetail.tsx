@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import ClassEditor from '@/components/academic/ClassEditor';
 import ClassStudentManagement from '@/components/academic/ClassStudentManagement';
 import ClassScheduleManagement from '@/components/academic/ClassScheduleManagement';
+import ClassAttendanceRecords from '@/components/academic/ClassAttendanceRecords';
 
 const ClassDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -187,11 +188,7 @@ const ClassDetail: React.FC = () => {
               </TabsContent>
 
               <TabsContent value="attendance" className="mt-0">
-                <div className="text-center py-12 text-gray-500">
-                  <UserCheck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                  <h3 className="text-lg font-medium mb-2">点名情况</h3>
-                  <p>点名功能开发中...</p>
-                </div>
+                <ClassAttendanceRecords classId={parseInt(id!)} />
               </TabsContent>
             </div>
           </Tabs>
