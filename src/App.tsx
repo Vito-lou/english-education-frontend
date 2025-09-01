@@ -14,6 +14,9 @@ import StudentDetail from '@/pages/academic/StudentDetail'
 import Orders from '@/pages/finance/Orders'
 import Classes from '@/pages/academic/Classes'
 import ClassDetail from '@/pages/academic/ClassDetail'
+import LessonArrangements from '@/pages/parent-interaction/LessonArrangements'
+import HomeworkAssignments from '@/pages/parent-interaction/HomeworkAssignments'
+import LessonComments from '@/pages/parent-interaction/LessonComments'
 
 import PlaceholderPage from '@/components/PlaceholderPage'
 import Layout from '@/components/Layout'
@@ -171,31 +174,31 @@ function App() {
 
           {/* 家校互动 */}
           <Route
-            path="/family-school/homework"
+            path="/parent-interaction/lesson-arrangements"
             element={
               <ProtectedRoute>
                 <Layout>
-                  <PlaceholderPage
-                    title="课后作业"
-                    description="布置和管理学生课后作业"
-                    icon="📚"
-                    features={["作业布置", "提交管理", "批改反馈", "完成统计"]}
-                  />
+                  <LessonArrangements />
                 </Layout>
               </ProtectedRoute>
             }
           />
           <Route
-            path="/family-school/reviews"
+            path="/parent-interaction/homework"
             element={
               <ProtectedRoute>
                 <Layout>
-                  <PlaceholderPage
-                    title="课后点评"
-                    description="对学生课堂表现进行点评"
-                    icon="⭐"
-                    features={["表现评价", "进步记录", "家长沟通", "激励机制"]}
-                  />
+                  <HomeworkAssignments />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/parent-interaction/comments"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <LessonComments />
                 </Layout>
               </ProtectedRoute>
             }
