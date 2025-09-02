@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Edit, Trash2, Calendar, Clock, Upload, X, FileText, Image, Video, CalendarIcon } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Calendar, Clock, Upload, X, FileText, Image, Video, CalendarIcon, BookOpen, MessageSquare, Zap, CheckCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
+interface KnowledgePoint {
+  id: number;
+  type: 'vocabulary' | 'sentence_pattern' | 'grammar';
+  content: string;
+  explanation?: string;
+  example_sentences?: string[];
+  previously_assigned?: boolean;
+}
+
+interface CourseUnit {
+  id: number;
+  name: string;
+  description: string;
+  course: {
+    id: number;
+    name: string;
+  };
+  knowledge_points?: KnowledgePoint[];
+}
+
 interface HomeworkAssignment {
   id: number;
   title: string;
@@ -24,6 +44,8 @@ interface HomeworkAssignment {
     size: number;
     type: string;
   }>;
+  unit?: CourseUnit;
+  knowledge_points?: KnowledgePoint[];
   class: {
     id: number;
     name: string;
@@ -69,11 +91,13 @@ const HomeworkAssignments: React.FC = () => {
   const [editingHomework, setEditingHomework] = useState<HomeworkAssignment | null>(null);
   const [formData, setFormData] = useState({
     class_id: '',
+    unit_id: '',
     title: '',
     requirements: '',
     due_date: '',
     due_time: '',
     status: 'active' as 'active' | 'draft',
+    knowledge_point_ids: [] as number[],
   });
   const [attachments, setAttachments] = useState<File[]>([]);
   const [existingAttachments, setExistingAttachments] = useState<Array<{
@@ -111,18 +135,66 @@ const HomeworkAssignments: React.FC = () => {
     enabled: dialogOpen,
   });
 
+  // 获取选中班级的单元列表
+  const { data: unitsData, refetch: refetchUnits } = useQuery({
+    queryKey: ['class-units', formData.class_id],
+    queryFn: async () => {
+      if (!formData.class_id) return { data: [] };
+      const response = await api.get(`/admin/homework-assignments/classes/${formData.class_id}/units`);
+      return response.data;
+    },
+    enabled: dialogOpen && !!formData.class_id,
+  });
+
+  // 获取选中单元的知识点列表
+  const { data: knowledgePointsData, refetch: refetchKnowledgePoints } = useQuery({
+    queryKey: ['unit-knowledge-points', formData.unit_id, formData.class_id],
+    queryFn: async () => {
+      if (!formData.unit_id) return { data: { knowledge_points: [] } };
+      const params = new URLSearchParams();
+      if (formData.class_id) params.append('class_id', formData.class_id);
+      const response = await api.get(`/admin/homework-assignments/units/${formData.unit_id}/knowledge-points?${params}`);
+      return response.data;
+    },
+    enabled: dialogOpen && !!formData.unit_id,
+  });
+
+  // 当编辑作业时，确保数据正确加载
+  useEffect(() => {
+    if (editingHomework && dialogOpen) {
+      // 如果有单元ID但单元数据还没加载，手动触发查询
+      if (formData.unit_id && (!unitsData || unitsData.data.length === 0)) {
+        refetchUnits();
+      }
+      // 如果有知识点但知识点数据还没加载，手动触发查询
+      if (formData.unit_id && (!knowledgePointsData || knowledgePointsData.data.knowledge_points.length === 0)) {
+        refetchKnowledgePoints();
+      }
+    }
+  }, [editingHomework, dialogOpen, formData.unit_id, unitsData, knowledgePointsData, refetchUnits, refetchKnowledgePoints]);
+
   // 创建/更新作业
   const homeworkMutation = useMutation({
     mutationFn: async (data: typeof formData & { attachments?: File[] }) => {
       const formDataToSend = new FormData();
       formDataToSend.append('title', data.title);
       formDataToSend.append('class_id', data.class_id);
+      if (data.unit_id) {
+        formDataToSend.append('unit_id', data.unit_id);
+      }
       formDataToSend.append('requirements', data.requirements);
 
       // 合并日期和时间
       const dueDateTimeStr = `${data.due_date}T${data.due_time}:00`;
       formDataToSend.append('due_date', dueDateTimeStr);
       formDataToSend.append('status', data.status);
+
+      // 添加知识点IDs
+      if (data.knowledge_point_ids && data.knowledge_point_ids.length > 0) {
+        data.knowledge_point_ids.forEach((id, index) => {
+          formDataToSend.append(`knowledge_point_ids[${index}]`, id.toString());
+        });
+      }
 
       // 添加附件
       if (data.attachments) {
@@ -195,11 +267,13 @@ const HomeworkAssignments: React.FC = () => {
   const resetForm = () => {
     setFormData({
       class_id: '',
+      unit_id: '',
       title: '',
       requirements: '',
       due_date: '',
       due_time: '',
       status: 'active',
+      knowledge_point_ids: [],
     });
     setAttachments([]);
     setExistingAttachments([]);
@@ -215,11 +289,13 @@ const HomeworkAssignments: React.FC = () => {
 
     setFormData({
       class_id: homework.class.id.toString(),
+      unit_id: homework.unit?.id?.toString() || '',
       title: homework.title,
       requirements: homework.requirements,
       due_date: dateStr,
       due_time: timeStr,
       status: homework.status === 'expired' ? 'active' : homework.status, // 转换expired为active
+      knowledge_point_ids: homework.knowledge_points?.map(kp => kp.id) || [],
     });
 
     // 设置现有附件
@@ -328,7 +404,12 @@ const HomeworkAssignments: React.FC = () => {
                 <Label htmlFor="class_id">选择班级</Label>
                 <Select
                   value={formData.class_id}
-                  onValueChange={(value) => setFormData({ ...formData, class_id: value })}
+                  onValueChange={(value) => setFormData({
+                    ...formData,
+                    class_id: value,
+                    unit_id: '', // 清空单元选择
+                    knowledge_point_ids: [] // 清空知识点选择
+                  })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="请选择班级" />
@@ -344,6 +425,119 @@ const HomeworkAssignments: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* 单元选择 */}
+              {formData.class_id && (
+                <div>
+                  <Label htmlFor="unit_id">选择单元（可选）</Label>
+                  <Select
+                    value={formData.unit_id || "none"}
+                    onValueChange={(value) => {
+                      const newUnitId = value === "none" ? "" : value;
+                      setFormData({
+                        ...formData,
+                        unit_id: newUnitId,
+                        // 如果是编辑模式且单元没有改变，保持知识点选择；否则清空
+                        knowledge_point_ids: editingHomework && newUnitId === editingHomework.unit?.id?.toString()
+                          ? formData.knowledge_point_ids
+                          : []
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="请选择单元" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">不选择单元</SelectItem>
+                      {unitsData?.data?.map((unit: CourseUnit) => (
+                        <SelectItem key={unit.id} value={unit.id.toString()}>
+                          {unit.name}
+                          <span className="text-muted-foreground ml-2">
+                            ({unit.knowledge_points?.length || 0} 个知识点)
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    选择单元后可以从该单元的知识点中选择本次作业要练习的内容
+                  </p>
+                </div>
+              )}
+
+              {/* 知识点选择 */}
+              {formData.unit_id && knowledgePointsData?.data?.knowledge_points && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>选择知识点</Label>
+                    <div className="text-sm text-muted-foreground">
+                      已选择 {formData.knowledge_point_ids.length} / {knowledgePointsData.data.knowledge_points.length} 个
+                    </div>
+                  </div>
+
+                  <div className="border rounded-lg p-3 max-h-60 overflow-y-auto space-y-2">
+                    {knowledgePointsData.data.knowledge_points.map((point: KnowledgePoint) => (
+                      <div key={point.id} className="flex items-center space-x-3 p-2 hover:bg-muted rounded">
+                        <input
+                          type="checkbox"
+                          id={`kp-${point.id}`}
+                          checked={formData.knowledge_point_ids.includes(point.id)}
+                          onChange={(e) => {
+                            const newIds = e.target.checked
+                              ? [...formData.knowledge_point_ids, point.id]
+                              : formData.knowledge_point_ids.filter(id => id !== point.id);
+                            setFormData({ ...formData, knowledge_point_ids: newIds });
+                          }}
+                          className="rounded"
+                        />
+                        <label htmlFor={`kp-${point.id}`} className="flex-1 cursor-pointer">
+                          <div className="flex items-center space-x-2">
+                            {point.type === 'vocabulary' && <BookOpen className="h-4 w-4 text-blue-500" />}
+                            {point.type === 'sentence_pattern' && <MessageSquare className="h-4 w-4 text-green-500" />}
+                            {point.type === 'grammar' && <Zap className="h-4 w-4 text-purple-500" />}
+                            <span className="font-medium">{point.content}</span>
+                            {point.previously_assigned && (
+                              <div title="之前已布置过">
+                                <AlertCircle className="h-4 w-4 text-orange-500" />
+                              </div>
+                            )}
+                          </div>
+                          {point.explanation && (
+                            <p className="text-sm text-muted-foreground mt-1">{point.explanation}</p>
+                          )}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between items-center mt-2">
+                    <div className="text-sm text-muted-foreground">
+                      💡 橙色图标表示该知识点在此单元中已布置过作业
+                    </div>
+                    <div className="space-x-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const allIds = knowledgePointsData.data.knowledge_points.map((p: KnowledgePoint) => p.id);
+                          setFormData({ ...formData, knowledge_point_ids: allIds });
+                        }}
+                      >
+                        全选
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setFormData({ ...formData, knowledge_point_ids: [] })}
+                      >
+                        清空
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <Label htmlFor="title">作业标题</Label>
