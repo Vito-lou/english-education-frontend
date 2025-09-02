@@ -13,21 +13,33 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 
-interface LessonArrangement {
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+}
+
+interface ClassScheduleWithLesson {
   id: number;
-  schedule: {
+  schedule_date: string;
+  formatted_schedule_date: string;
+  formatted_created_at: string;
+  teaching_focus: string;
+  class: {
     id: number;
-    schedule_date: string;
+    name: string;
+  };
+  teacher: {
+    id: number;
+    name: string;
+  };
+  time_slot: {
+    id: number;
+    name: string;
     start_time: string;
     end_time: string;
-    class: {
-      id: number;
-      name: string;
-    };
-    teacher: {
-      id: number;
-      name: string;
-    };
   };
   lesson: {
     id: number;
@@ -41,8 +53,7 @@ interface LessonArrangement {
         name: string;
       };
     };
-  };
-  teaching_focus: string;
+  } | null;
   created_at: string;
 }
 
@@ -64,11 +75,31 @@ interface Lesson {
   sort_order: number;
 }
 
+interface UnassignedSchedule {
+  id: number;
+  schedule_date: string;
+  formatted_schedule_date: string;
+  class: {
+    id: number;
+    name: string;
+  };
+  teacher: {
+    id: number;
+    name: string;
+  };
+  time_slot: {
+    id: number;
+    name: string;
+    start_time: string;
+    end_time: string;
+  };
+}
+
 const LessonArrangements: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingArrangement, setEditingArrangement] = useState<LessonArrangement | null>(null);
+  const [editingSchedule, setEditingSchedule] = useState<ClassScheduleWithLesson | null>(null);
   const [formData, setFormData] = useState({
     schedule_id: '',
     lesson_id: '',
@@ -87,7 +118,7 @@ const LessonArrangements: React.FC = () => {
       if (selectedClassId && selectedClassId !== 'all') params.append('class_id', selectedClassId);
       if (searchKeyword) params.append('keyword', searchKeyword);
 
-      const response = await api.get(`/admin/lesson-arrangements?${params}`);
+      const response = await api.get(`/admin/class-schedules/lesson-arrangements?${params}`);
       return response.data;
     },
   });
@@ -102,11 +133,11 @@ const LessonArrangements: React.FC = () => {
   });
 
   // 当选择排课时，获取对应级别的课时内容
-  const { data: scheduleLessonsData, refetch: refetchScheduleLessons } = useQuery({
+  const { data: scheduleLessonsData } = useQuery({
     queryKey: ['schedule-lessons', formData.schedule_id],
     queryFn: async () => {
       if (!formData.schedule_id) return null;
-      const response = await api.get(`/admin/lesson-arrangements/schedule/${formData.schedule_id}/lessons`);
+      const response = await api.get(`/admin/class-schedules/${formData.schedule_id}/available-lessons`);
       return response.data;
     },
     enabled: !!formData.schedule_id,
@@ -116,68 +147,74 @@ const LessonArrangements: React.FC = () => {
   React.useEffect(() => {
     if (scheduleLessonsData?.data?.units) {
       setSelectedScheduleUnits(scheduleLessonsData.data.units);
-      // 清空之前选择的课时
-      setFormData(prev => ({ ...prev, lesson_id: '' }));
+      // 只有在新建模式下才清空课时选择，编辑模式下保持原有选择
+      if (!editingSchedule) {
+        setFormData(prev => ({ ...prev, lesson_id: '' }));
+      }
     }
-  }, [scheduleLessonsData]);
+  }, [scheduleLessonsData, editingSchedule]);
 
-  // 获取可安排的排课
+  // 获取可安排的排课（未设置课程内容的排课）
   const { data: schedulesData } = useQuery({
-    queryKey: ['available-schedules'],
+    queryKey: ['unassigned-schedules'],
     queryFn: async () => {
-      const response = await api.get('/admin/class-schedules?status=scheduled&without_arrangement=1');
+      const response = await api.get('/admin/class-schedules/unassigned');
       return response.data;
     },
-    enabled: dialogOpen && !editingArrangement,
+    enabled: dialogOpen && !editingSchedule,
   });
 
-  // 创建/更新课程安排
-  const arrangementMutation = useMutation({
+  // 设置课程内容
+  const setLessonMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      if (editingArrangement) {
-        const response = await api.put(`/admin/lesson-arrangements/${editingArrangement.id}`, data);
-        return response.data;
-      } else {
-        const response = await api.post('/admin/lesson-arrangements', data);
-        return response.data;
-      }
+      const response = await api.put(`/admin/class-schedules/${data.schedule_id}/lesson-content`, {
+        lesson_id: data.lesson_id,
+        teaching_focus: data.teaching_focus,
+      });
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lesson-arrangements'] });
+      queryClient.invalidateQueries({ queryKey: ['unassigned-schedules'] });
       setDialogOpen(false);
       resetForm();
       addToast({
         type: 'success',
-        title: editingArrangement ? '更新成功' : '创建成功',
-        description: '课程安排已保存',
+        title: editingSchedule ? '更新成功' : '设置成功',
+        description: editingSchedule ? '课程内容已更新' : '课程内容已设置',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       addToast({
         type: 'error',
-        title: '操作失败',
+        title: '设置失败',
         description: error.response?.data?.message || '请稍后重试',
       });
     },
   });
 
-  // 删除课程安排
-  const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
-      await api.delete(`/admin/lesson-arrangements/${id}`);
+  // 清除课程内容
+  const clearLessonMutation = useMutation({
+    mutationFn: async (scheduleId: number) => {
+      const response = await api.put(`/admin/class-schedules/${scheduleId}/lesson-content`, {
+        lesson_id: null,
+        teaching_focus: null,
+      });
+      return response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lesson-arrangements'] });
+      queryClient.invalidateQueries({ queryKey: ['unassigned-schedules'] });
       addToast({
         type: 'success',
-        title: '删除成功',
-        description: '课程安排已删除',
+        title: '清除成功',
+        description: '课程内容已清除',
       });
     },
-    onError: (error: any) => {
+    onError: (error: ApiError) => {
       addToast({
         type: 'error',
-        title: '删除失败',
+        title: '清除失败',
         description: error.response?.data?.message || '请稍后重试',
       });
     },
@@ -190,20 +227,22 @@ const LessonArrangements: React.FC = () => {
       teaching_focus: '',
     });
     setSelectedScheduleUnits([]);
-    setEditingArrangement(null);
+    setEditingSchedule(null);
   };
 
-  const handleEdit = async (arrangement: LessonArrangement) => {
-    setEditingArrangement(arrangement);
+  const handleEdit = async (schedule: ClassScheduleWithLesson) => {
+    setEditingSchedule(schedule);
+
+    // 设置表单数据
     setFormData({
-      schedule_id: arrangement.schedule.id.toString(),
-      lesson_id: arrangement.lesson.id.toString(),
-      teaching_focus: arrangement.teaching_focus || '',
+      schedule_id: schedule.id.toString(),
+      lesson_id: schedule.lesson?.id.toString() || '',
+      teaching_focus: schedule.teaching_focus || '',
     });
 
     // 加载对应排课的课时列表
     try {
-      const response = await api.get(`/admin/lesson-arrangements/schedule/${arrangement.schedule.id}/lessons`);
+      const response = await api.get(`/admin/class-schedules/${schedule.id}/available-lessons`);
       if (response.data?.data?.units) {
         setSelectedScheduleUnits(response.data.data.units);
       }
@@ -214,23 +253,25 @@ const LessonArrangements: React.FC = () => {
     setDialogOpen(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('确定要删除这个课程安排吗？')) {
-      deleteMutation.mutate(id);
+  const handleClear = (scheduleId: number) => {
+    if (confirm('确定要清除这个排课的课程内容吗？')) {
+      clearLessonMutation.mutate(scheduleId);
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    arrangementMutation.mutate(formData);
+    setLessonMutation.mutate(formData);
   };
 
   const arrangements = arrangementsData?.data?.data || [];
   const classes = classesData?.data || [];
   const schedules = schedulesData?.data || [];
 
-  // 确保 classes 是数组
+  // 确保数据是数组
   const safeClasses = Array.isArray(classes) ? classes : [];
+  const safeArrangements = Array.isArray(arrangements) ? arrangements : [];
+  const safeSchedules = Array.isArray(schedules) ? schedules : [];
 
   return (
     <div className="space-y-6">
@@ -253,12 +294,12 @@ const LessonArrangements: React.FC = () => {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>
-                {editingArrangement ? '编辑课程安排' : '设置课程内容'}
+                {editingSchedule ? `编辑课程内容 - ${editingSchedule.class.name}` : '设置课程内容'}
               </DialogTitle>
             </DialogHeader>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {!editingArrangement && (
+              {!editingSchedule ? (
                 <div>
                   <Label htmlFor="schedule_id">选择排课</Label>
                   <Select
@@ -269,13 +310,25 @@ const LessonArrangements: React.FC = () => {
                       <SelectValue placeholder="请选择排课" />
                     </SelectTrigger>
                     <SelectContent>
-                      {schedules.map((schedule: any) => (
+                      {safeSchedules.map((schedule: UnassignedSchedule) => (
                         <SelectItem key={schedule.id} value={schedule.id.toString()}>
-                          {schedule.schedule_date} {schedule.start_time}-{schedule.end_time} - {schedule.class.name}
+                          {schedule.formatted_schedule_date} {schedule.time_slot.start_time}-{schedule.time_slot.end_time} - {schedule.class.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              ) : (
+                <div>
+                  <Label>排课信息</Label>
+                  <div className="p-3 bg-gray-50 rounded-md">
+                    <div className="font-medium">
+                      {editingSchedule.formatted_schedule_date} {editingSchedule.time_slot.start_time}-{editingSchedule.time_slot.end_time}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      班级：{editingSchedule.class.name} | 教师：{editingSchedule.teacher.name}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -329,8 +382,8 @@ const LessonArrangements: React.FC = () => {
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   取消
                 </Button>
-                <Button type="submit" disabled={arrangementMutation.isPending}>
-                  {arrangementMutation.isPending ? '保存中...' : '保存'}
+                <Button type="submit" disabled={setLessonMutation.isPending}>
+                  {setLessonMutation.isPending ? '保存中...' : (editingSchedule ? '更新' : '保存')}
                 </Button>
               </div>
             </form>
@@ -378,7 +431,7 @@ const LessonArrangements: React.FC = () => {
         <CardContent>
           {isLoading ? (
             <div className="text-center py-8">加载中...</div>
-          ) : arrangements.length === 0 ? (
+          ) : safeArrangements.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               暂无课程安排
             </div>
@@ -396,28 +449,34 @@ const LessonArrangements: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {arrangements.map((arrangement: LessonArrangement) => (
-                  <TableRow key={arrangement.id}>
+                {safeArrangements.map((schedule: ClassScheduleWithLesson) => (
+                  <TableRow key={schedule.id}>
                     <TableCell>
-                      {arrangement.schedule.schedule_date}
+                      {schedule.formatted_schedule_date}
                       <div className="text-sm text-gray-500">
-                        {arrangement.schedule.start_time}-{arrangement.schedule.end_time}
+                        {schedule.time_slot.start_time}-{schedule.time_slot.end_time}
                       </div>
                     </TableCell>
-                    <TableCell>{arrangement.schedule.class.name}</TableCell>
-                    <TableCell>{arrangement.schedule.teacher.name}</TableCell>
-                    <TableCell>{arrangement.lesson.unit.name}</TableCell>
+                    <TableCell>{schedule.class.name}</TableCell>
+                    <TableCell>{schedule.teacher.name}</TableCell>
+                    <TableCell>{schedule.lesson?.unit.name || '-'}</TableCell>
                     <TableCell>
-                      <div className="font-medium">{arrangement.lesson.name}</div>
-                      {arrangement.lesson.content && (
-                        <div className="text-sm text-gray-500 max-w-xs truncate" title={arrangement.lesson.content}>
-                          {arrangement.lesson.content}
+                      {schedule.lesson ? (
+                        <div>
+                          <div className="font-medium">{schedule.lesson.name}</div>
+                          {schedule.lesson.content && (
+                            <div className="text-sm text-gray-500 max-w-xs truncate" title={schedule.lesson.content}>
+                              {schedule.lesson.content}
+                            </div>
+                          )}
                         </div>
+                      ) : (
+                        <span className="text-gray-400">未设置</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="max-w-xs truncate" title={arrangement.teaching_focus}>
-                        {arrangement.teaching_focus || '-'}
+                      <div className="max-w-xs truncate" title={schedule.teaching_focus}>
+                        {schedule.teaching_focus || '-'}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -425,17 +484,19 @@ const LessonArrangements: React.FC = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleEdit(arrangement)}
+                          onClick={() => handleEdit(schedule)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(arrangement.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {schedule.lesson && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleClear(schedule.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
