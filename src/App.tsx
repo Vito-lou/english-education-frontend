@@ -17,6 +17,7 @@ import ClassDetail from '@/pages/academic/ClassDetail'
 import LessonArrangements from '@/pages/parent-interaction/LessonArrangements'
 import HomeworkAssignments from '@/pages/parent-interaction/HomeworkAssignments'
 import LessonComments from '@/pages/parent-interaction/LessonComments'
+import TestManualAttendance from '@/pages/TestManualAttendance'
 
 import PlaceholderPage from '@/components/PlaceholderPage'
 import Layout from '@/components/Layout'

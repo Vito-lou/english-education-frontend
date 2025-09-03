@@ -188,7 +188,7 @@ const ClassDetail: React.FC = () => {
               </TabsContent>
 
               <TabsContent value="attendance" className="mt-0">
-                <ClassAttendanceRecords classId={parseInt(id!)} />
+                <ClassAttendanceRecords classId={parseInt(id!)} className={classInfo.name} />
               </TabsContent>
             </div>
           </Tabs>

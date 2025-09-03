@@ -5,11 +5,13 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Calendar, Search, UserCheck } from 'lucide-react';
+import { Search, UserCheck, Plus } from 'lucide-react';
 import { api } from '@/lib/api';
+import ManualAttendanceDialog from './ManualAttendanceDialog';
 
 interface AttendanceRecord {
   id: number;
+  record_type?: string;
   schedule_date: string;
   time_range: string;
   course_name: string;
@@ -24,12 +26,14 @@ interface AttendanceRecord {
 
 interface ClassAttendanceRecordsProps {
   classId: number;
+  className?: string;
 }
 
-const ClassAttendanceRecords: React.FC<ClassAttendanceRecordsProps> = ({ classId }) => {
+const ClassAttendanceRecords: React.FC<ClassAttendanceRecordsProps> = ({ classId, className = '' }) => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [studentName, setStudentName] = useState('');
+  const [manualAttendanceOpen, setManualAttendanceOpen] = useState(false);
 
   // 获取点名记录
   const { data: recordsData, isLoading, refetch } = useQuery({
@@ -76,6 +80,13 @@ const ClassAttendanceRecords: React.FC<ClassAttendanceRecordsProps> = ({ classId
           <h3 className="text-lg font-medium">点名记录</h3>
           <p className="text-sm text-muted-foreground">查看班级的历史点名记录</p>
         </div>
+        <Button
+          onClick={() => setManualAttendanceOpen(true)}
+          className="flex items-center space-x-2"
+        >
+          <Plus className="h-4 w-4" />
+          <span>未排课直接点名</span>
+        </Button>
       </div>
 
       {/* 筛选条件 */}
@@ -130,6 +141,7 @@ const ClassAttendanceRecords: React.FC<ClassAttendanceRecordsProps> = ({ classId
               <TableHead>学员</TableHead>
               <TableHead>到课状态</TableHead>
               <TableHead>扣除课时</TableHead>
+              <TableHead>类型</TableHead>
               <TableHead>备注</TableHead>
               <TableHead>记录时间</TableHead>
             </TableRow>
@@ -137,13 +149,13 @@ const ClassAttendanceRecords: React.FC<ClassAttendanceRecordsProps> = ({ classId
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   加载中...
                 </TableCell>
               </TableRow>
             ) : records.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   <div className="text-center">
                     <UserCheck className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                     <h3 className="text-lg font-medium mb-2">暂无点名记录</h3>
@@ -165,6 +177,11 @@ const ClassAttendanceRecords: React.FC<ClassAttendanceRecordsProps> = ({ classId
                     </Badge>
                   </TableCell>
                   <TableCell>{record.deducted_lessons}</TableCell>
+                  <TableCell>
+                    <Badge variant={record.record_type === 'manual' ? 'secondary' : 'default'}>
+                      {record.record_type === 'manual' ? '手动补录' : '正常排课'}
+                    </Badge>
+                  </TableCell>
                   <TableCell>{record.teacher_notes || '-'}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(record.recorded_at).toLocaleString()}
@@ -175,6 +192,14 @@ const ClassAttendanceRecords: React.FC<ClassAttendanceRecordsProps> = ({ classId
           </TableBody>
         </Table>
       </div>
+
+      {/* 手动点名弹窗 */}
+      <ManualAttendanceDialog
+        open={manualAttendanceOpen}
+        onOpenChange={setManualAttendanceOpen}
+        classId={classId}
+        className={className}
+      />
     </div>
   );
 };
