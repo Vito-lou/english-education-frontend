@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
+import { Search, Link, Unlink } from 'lucide-react';
 
 interface Student {
   id: number;
@@ -25,6 +26,12 @@ interface Student {
   source?: string;
   remarks?: string;
   status: 'active' | 'inactive';
+  user_id?: number;
+  user?: {
+    id: number;
+    name: string;
+    email: string;
+  };
 }
 
 interface StudentEditorProps {
@@ -58,6 +65,9 @@ const StudentEditor: React.FC<StudentEditorProps> = ({
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showUserSearch, setShowUserSearch] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [selectedUser, setSelectedUser] = useState<{ id: number, name: string, email: string } | null | undefined>(undefined);
 
   const { addToast } = useToast();
   const queryClient = useQueryClient();
@@ -69,6 +79,28 @@ const StudentEditor: React.FC<StudentEditorProps> = ({
       const response = await api.get('/admin/students/creatable-types');
       return response.data.data;
     },
+  });
+
+  // 搜索用户
+  const { data: usersData, isLoading: isSearchingUsers } = useQuery({
+    queryKey: ['users-search', userSearchQuery],
+    queryFn: async () => {
+      if (!userSearchQuery.trim()) return { data: [] };
+      const response = await api.get(`/admin/users?search=${encodeURIComponent(userSearchQuery)}&per_page=10`);
+      return response.data;
+    },
+    enabled: showUserSearch && userSearchQuery.length > 0,
+  });
+
+  // 获取所有用户（用于初始显示）
+  const { data: allUsersData } = useQuery({
+    queryKey: ['users-all'],
+    queryFn: async () => {
+      const response = await api.get('/admin/users?per_page=20');
+      console.log('获取所有用户响应:', response.data); // 调试信息
+      return response.data;
+    },
+    enabled: showUserSearch && !userSearchQuery.trim(),
   });
 
   // 保存学员
@@ -103,6 +135,73 @@ const StudentEditor: React.FC<StudentEditorProps> = ({
     },
   });
 
+  // 关联用户
+  const linkUserMutation = useMutation({
+    mutationFn: async ({ studentId, userId }: { studentId: number, userId: number }) => {
+      const response = await api.post(`/admin/students/${studentId}/link-user`, { user_id: userId });
+      return response.data;
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      addToast({
+        type: 'success',
+        title: '关联成功',
+        description: '学员已成功关联用户账号',
+      });
+
+      // UI状态已经在 handleUserSelect 中设置了，这里不需要再次设置
+      // 只需要确保搜索状态被清理
+      setShowUserSearch(false);
+      setUserSearchQuery('');
+
+      console.log('关联成功，当前selectedUser:', selectedUser); // 调试信息
+    },
+    onError: (error: any, variables) => {
+      // 关联失败时，回滚UI状态
+      setSelectedUser(undefined); // 回滚到初始状态
+      setShowUserSearch(true); // 重新显示搜索界面
+
+      addToast({
+        type: 'error',
+        title: '关联失败',
+        description: error.response?.data?.message || '关联用户失败',
+      });
+
+      console.log('关联失败，已回滚UI状态'); // 调试信息
+    },
+  });
+
+  // 取消关联用户
+  const unlinkUserMutation = useMutation({
+    mutationFn: async (studentId: number) => {
+      const response = await api.delete(`/admin/students/${studentId}/unlink-user`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+
+      // 立即更新UI状态
+      setSelectedUser(null);
+
+      addToast({
+        type: 'success',
+        title: '取消关联成功',
+        description: '已取消学员与用户账号的关联',
+      });
+
+      console.log('取消关联成功，已清空selectedUser'); // 调试信息
+    },
+    onError: (error: any) => {
+      addToast({
+        type: 'error',
+        title: '取消关联失败',
+        description: error.response?.data?.message || '取消关联失败',
+      });
+
+      console.log('取消关联失败'); // 调试信息
+    },
+  });
+
   // 重置表单
   const resetForm = () => {
     if (student) {
@@ -122,6 +221,12 @@ const StudentEditor: React.FC<StudentEditorProps> = ({
         status: student.status || 'active',
         create_parent_account: false,
       });
+      // 设置已关联的用户信息
+      if (student.user) {
+        setSelectedUser(student.user);
+      } else {
+        setSelectedUser(undefined); // 使用 undefined 表示初始状态（未关联）
+      }
     } else {
       setFormData({
         name: '',
@@ -139,8 +244,11 @@ const StudentEditor: React.FC<StudentEditorProps> = ({
         status: 'active',
         create_parent_account: false,
       });
+      setSelectedUser(undefined);
     }
     setErrors({});
+    setShowUserSearch(false);
+    setUserSearchQuery('');
   };
 
   useEffect(() => {
@@ -196,6 +304,37 @@ const StudentEditor: React.FC<StudentEditorProps> = ({
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  // 处理用户选择
+  const handleUserSelect = (user: { id: number, name: string, email: string }) => {
+    console.log('选择用户:', user); // 调试信息
+
+    if (student) {
+      // 先设置选中的用户，这样UI会立即显示关联状态
+      setSelectedUser(user);
+      setUserSearchQuery('');
+      setShowUserSearch(false);
+
+      // 然后调用API进行关联
+      linkUserMutation.mutate({ studentId: student.id, userId: user.id });
+    } else {
+      // 如果是新建学员，只设置状态
+      setSelectedUser(user);
+      setUserSearchQuery('');
+      setShowUserSearch(false);
+    }
+  };
+
+  // 处理取消关联
+  const handleUnlinkUser = () => {
+    if (student) {
+      console.log('开始取消关联，当前selectedUser:', selectedUser); // 调试信息
+
+      // 先调用API，成功后再在onSuccess中更新UI状态
+      // 这样如果API失败，UI状态不会被错误地清空
+      unlinkUserMutation.mutate(student.id);
     }
   };
 
@@ -306,6 +445,189 @@ const StudentEditor: React.FC<StudentEditorProps> = ({
               </Select>
             </div>
           </div>
+
+          {/* 账号关联 - 只在编辑学员时显示 */}
+          {student && (
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">账号关联</h3>
+
+              {(() => {
+                // 优先使用 selectedUser 状态，如果为 null 则表示已取消关联
+                if (selectedUser === null) return false;
+                // 如果 selectedUser 有值，则显示关联状态
+                if (selectedUser) return true;
+                // 如果 selectedUser 未设置（undefined），则使用 student.user
+                return student?.user ? true : false;
+              })() ? (
+                <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Link className="h-5 w-5 text-green-600" />
+                    <div>
+                      <p className="font-medium text-green-900">
+                        已关联用户：{selectedUser?.name || student?.user?.name}
+                      </p>
+                      <p className="text-sm text-green-700">
+                        邮箱：{selectedUser?.email || student?.user?.email}
+                      </p>
+                      {/* 调试信息 */}
+                      {process.env.NODE_ENV === 'development' && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Debug: selectedUser={selectedUser === null ? 'null(取消关联)' : selectedUser === undefined ? 'undefined(初始)' : 'set'},
+                          student.user={student?.user ? 'set' : 'null'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUnlinkUser}
+                    disabled={unlinkUserMutation.isPending}
+                    className="text-red-600 border-red-200 hover:bg-red-50"
+                  >
+                    <Unlink className="h-4 w-4 mr-1" />
+                    取消关联
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600">
+                    该学员尚未关联用户账号，关联后家长可通过H5端查看学习进度
+                  </p>
+                  {/* 调试信息 */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <p className="text-xs text-gray-400">
+                      Debug: selectedUser={selectedUser === null ? 'null(取消关联)' : selectedUser === undefined ? 'undefined(初始)' : `${selectedUser.name}(${selectedUser.id})`},
+                      student.user={student?.user ? `${student.user.name}(${student.user.id})` : 'null'}
+                    </p>
+                  )}
+
+                  {!showUserSearch ? (
+                    <div className="space-y-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowUserSearch(true)}
+                        className="w-full"
+                      >
+                        <Search className="h-4 w-4 mr-2" />
+                        搜索并关联用户账号
+                      </Button>
+                      <p className="text-xs text-gray-500 text-center">
+                        点击后可搜索现有用户或浏览所有用户
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex space-x-2">
+                        <Input
+                          placeholder="输入用户姓名或邮箱搜索..."
+                          value={userSearchQuery}
+                          onChange={(e) => setUserSearchQuery(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowUserSearch(false);
+                            setUserSearchQuery('');
+                          }}
+                        >
+                          取消
+                        </Button>
+                      </div>
+
+                      {/* 快捷操作按钮 */}
+                      {!userSearchQuery.trim() && (
+                        <div className="flex space-x-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setUserSearchQuery('')}
+                            className="text-blue-600 hover:text-blue-700"
+                          >
+                            显示所有用户
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* 搜索加载状态 */}
+                      {isSearchingUsers && (
+                        <div className="text-center py-3">
+                          <div className="text-sm text-gray-500">搜索中...</div>
+                        </div>
+                      )}
+
+                      {/* 用户列表 */}
+                      {(() => {
+                        const displayUsers = userSearchQuery.trim()
+                          ? usersData?.data?.data
+                          : allUsersData?.data?.data;
+
+                        if (displayUsers && displayUsers.length > 0) {
+                          return (
+                            <div className="border rounded-lg max-h-48 overflow-y-auto">
+                              <div className="p-2 bg-gray-50 border-b text-sm text-gray-600">
+                                {userSearchQuery.trim()
+                                  ? `搜索结果 (${displayUsers.length}个)`
+                                  : `所有用户 (显示前${displayUsers.length}个)`
+                                }
+                              </div>
+                              {displayUsers.map((user: any) => (
+                                <div
+                                  key={user.id}
+                                  className="p-3 hover:bg-blue-50 cursor-pointer border-b last:border-b-0 transition-colors"
+                                  onClick={() => handleUserSelect(user)}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="font-medium text-gray-900">{user.name}</div>
+                                      <div className="text-sm text-gray-500">{user.email || user.phone}</div>
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                      点击关联
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }
+
+                        if (userSearchQuery.trim() && !isSearchingUsers) {
+                          return (
+                            <div className="text-center py-6 text-gray-500">
+                              <Search className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                              <p className="text-sm">未找到匹配的用户</p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                请尝试其他关键词
+                              </p>
+                            </div>
+                          );
+                        }
+
+                        if (!userSearchQuery.trim() && !allUsersData?.data?.data) {
+                          return (
+                            <div className="text-center py-6 text-gray-500">
+                              <p className="text-sm">加载用户列表中...</p>
+                              <p className="text-xs text-gray-400 mt-1">
+                                或输入关键词搜索特定用户
+                              </p>
+                            </div>
+                          );
+                        }
+
+                        return null;
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 学员状态 */}
           <div className="space-y-4">
