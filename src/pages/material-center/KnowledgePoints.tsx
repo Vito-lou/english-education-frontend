@@ -17,12 +17,18 @@ interface KnowledgePoint {
   definition_en?: string;
   definition_cn?: string;
   explanation?: string;
-  example_sentence?: string;
-  audio_url?: string;
+  examples?: KnowledgePointExample[];
   tags?: KnowledgeTag[];
   stories?: Story[];
   created_at: string;
   updated_at: string;
+}
+
+interface KnowledgePointExample {
+  id: number;
+  example_en: string;
+  example_cn?: string;
+  sequence: number;
 }
 
 interface KnowledgeTag {
@@ -45,7 +51,7 @@ const KnowledgePoints: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState('');
   const [tagFilter, setTagFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -57,11 +63,11 @@ const KnowledgePoints: React.FC = () => {
         page: currentPage.toString(),
         per_page: '15',
       });
-      
+
       if (searchQuery) params.append('search', searchQuery);
       if (typeFilter) params.append('type', typeFilter);
       if (tagFilter) params.append('tag_id', tagFilter);
-      
+
       const response = await api.get(`/admin/material-center/knowledge-points?${params}`);
       return response.data;
     },
@@ -267,9 +273,14 @@ const KnowledgePoints: React.FC = () => {
                     <td className="py-3 px-4">
                       <div>
                         <div className="font-medium text-gray-900">{point.name}</div>
-                        {point.example_sentence && (
+                        {point.examples && point.examples.length > 0 && (
                           <div className="text-sm text-gray-600 mt-1 italic">
-                            "{point.example_sentence}"
+                            "{point.examples[0].example_en}"
+                            {point.examples.length > 1 && (
+                              <span className="text-xs text-gray-500 ml-2">
+                                (+{point.examples.length - 1} 个例句)
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>

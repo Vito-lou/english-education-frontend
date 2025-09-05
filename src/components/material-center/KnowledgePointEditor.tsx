@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
+import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface KnowledgePoint {
   id: number;
@@ -15,9 +16,15 @@ interface KnowledgePoint {
   definition_en?: string;
   definition_cn?: string;
   explanation?: string;
-  example_sentence?: string;
-  audio_url?: string;
+  examples?: KnowledgePointExample[];
   tags?: KnowledgeTag[];
+}
+
+interface KnowledgePointExample {
+  id?: number;
+  example_en: string;
+  example_cn?: string;
+  sequence: number;
 }
 
 interface KnowledgeTag {
@@ -43,10 +50,9 @@ const KnowledgePointEditor: React.FC<KnowledgePointEditorProps> = ({
     definition_en: '',
     definition_cn: '',
     explanation: '',
-    example_sentence: '',
-    audio_url: '',
   });
 
+  const [examples, setExamples] = useState<KnowledgePointExample[]>([]);
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -76,11 +82,20 @@ const KnowledgePointEditor: React.FC<KnowledgePointEditorProps> = ({
   // 保存知识点
   const saveMutation = useMutation({
     mutationFn: async (pointData: any) => {
+      const dataToSend = {
+        ...pointData,
+        examples: examples.map((example, index) => ({
+          example_en: example.example_en,
+          example_cn: example.example_cn || null,
+          sequence: example.sequence || index,
+        })),
+      };
+
       if (knowledgePoint) {
-        const response = await api.put(`/admin/material-center/knowledge-points/${knowledgePoint.id}`, pointData);
+        const response = await api.put(`/admin/material-center/knowledge-points/${knowledgePoint.id}`, dataToSend);
         return response.data;
       } else {
-        const response = await api.post('/admin/material-center/knowledge-points', pointData);
+        const response = await api.post('/admin/material-center/knowledge-points', dataToSend);
         return response.data;
       }
     },
@@ -109,9 +124,8 @@ const KnowledgePointEditor: React.FC<KnowledgePointEditorProps> = ({
         definition_en: knowledgePoint.definition_en || '',
         definition_cn: knowledgePoint.definition_cn || '',
         explanation: knowledgePoint.explanation || '',
-        example_sentence: knowledgePoint.example_sentence || '',
-        audio_url: knowledgePoint.audio_url || '',
       });
+      setExamples(knowledgePoint.examples || []);
       setSelectedTags(knowledgePoint.tags?.map(tag => tag.id) || []);
     } else {
       setFormData({
@@ -120,9 +134,8 @@ const KnowledgePointEditor: React.FC<KnowledgePointEditorProps> = ({
         definition_en: '',
         definition_cn: '',
         explanation: '',
-        example_sentence: '',
-        audio_url: '',
       });
+      setExamples([]);
       setSelectedTags([]);
     }
     setErrors({});
@@ -132,6 +145,41 @@ const KnowledgePointEditor: React.FC<KnowledgePointEditorProps> = ({
     setFormData(prev => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }));
+    }
+  };
+
+  // 例句管理函数
+  const addExample = () => {
+    setExamples(prev => [...prev, {
+      example_en: '',
+      example_cn: '',
+      sequence: prev.length,
+    }]);
+  };
+
+  const removeExample = (index: number) => {
+    setExamples(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateExample = (index: number, field: keyof KnowledgePointExample, value: string) => {
+    setExamples(prev => prev.map((example, i) =>
+      i === index ? { ...example, [field]: value } : example
+    ));
+  };
+
+  const moveExample = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index > 0) {
+      setExamples(prev => {
+        const newExamples = [...prev];
+        [newExamples[index - 1], newExamples[index]] = [newExamples[index], newExamples[index - 1]];
+        return newExamples.map((example, i) => ({ ...example, sequence: i }));
+      });
+    } else if (direction === 'down' && index < examples.length - 1) {
+      setExamples(prev => {
+        const newExamples = [...prev];
+        [newExamples[index], newExamples[index + 1]] = [newExamples[index + 1], newExamples[index]];
+        return newExamples.map((example, i) => ({ ...example, sequence: i }));
+      });
     }
   };
 
@@ -211,9 +259,8 @@ const KnowledgePointEditor: React.FC<KnowledgePointEditorProps> = ({
                 id="type"
                 value={formData.type || ''}
                 onChange={(e) => handleInputChange('type', e.target.value)}
-                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                  errors.type ? 'border-red-500' : ''
-                }`}
+                className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.type ? 'border-red-500' : ''
+                  }`}
               >
                 {types.map((type: any) => (
                   <option key={type.value} value={type.value}>
@@ -262,27 +309,88 @@ const KnowledgePointEditor: React.FC<KnowledgePointEditorProps> = ({
             />
           </div>
 
-          {/* 示例句 */}
+          {/* 例句管理 */}
           <div>
-            <Label htmlFor="example_sentence">示例句</Label>
-            <Textarea
-              id="example_sentence"
-              value={formData.example_sentence || ''}
-              onChange={(e) => handleInputChange('example_sentence', e.target.value)}
-              placeholder="请输入示例句"
-              rows={2}
-            />
-          </div>
+            <div className="flex justify-between items-center mb-4">
+              <Label>例句管理</Label>
+              <Button type="button" variant="outline" size="sm" onClick={addExample}>
+                <Plus className="w-4 h-4 mr-2" />
+                添加例句
+              </Button>
+            </div>
 
-          {/* 音频链接 */}
-          <div>
-            <Label htmlFor="audio_url">发音音频链接</Label>
-            <Input
-              id="audio_url"
-              value={formData.audio_url || ''}
-              onChange={(e) => handleInputChange('audio_url', e.target.value)}
-              placeholder="请输入音频文件URL"
-            />
+            <div className="space-y-4">
+              {examples.map((example, index) => (
+                <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="font-medium text-sm">例句 {index + 1}</h4>
+                    <div className="flex space-x-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => moveExample(index, 'up')}
+                        disabled={index === 0}
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => moveExample(index, 'down')}
+                        disabled={index === examples.length - 1}
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeExample(index)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-sm">英文例句 *</Label>
+                      <Textarea
+                        value={example.example_en}
+                        onChange={(e) => updateExample(index, 'example_en', e.target.value)}
+                        placeholder="请输入英文例句"
+                        rows={2}
+                        className="text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-sm">中文翻译</Label>
+                      <Textarea
+                        value={example.example_cn || ''}
+                        onChange={(e) => updateExample(index, 'example_cn', e.target.value)}
+                        placeholder="请输入中文翻译（可选）"
+                        rows={2}
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {examples.length === 0 && (
+                <div className="text-center py-8 text-gray-500 border-2 border-dashed border-gray-300 rounded-lg">
+                  <p className="mb-2">暂无例句</p>
+                  <Button type="button" variant="outline" size="sm" onClick={addExample}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    添加第一个例句
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 关联标签 */}
