@@ -95,6 +95,9 @@ export const getMenuIcon = (iconName: string): string => {
     DollarSign: "💰",
     Settings: "⚙️",
     FileText: "📄",
+    Archive: "📦",
+    Brain: "🧠",
+    Tags: "🏷️",
     BarChart3: "📊",
     Calendar: "📅",
   };

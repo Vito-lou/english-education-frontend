@@ -18,6 +18,9 @@ import LessonArrangements from '@/pages/parent-interaction/LessonArrangements'
 import HomeworkAssignments from '@/pages/parent-interaction/HomeworkAssignments'
 import LessonComments from '@/pages/parent-interaction/LessonComments'
 import TestManualAttendance from '@/pages/TestManualAttendance'
+import Stories from '@/pages/material-center/Stories'
+import KnowledgePoints from '@/pages/material-center/KnowledgePoints'
+import KnowledgeTags from '@/pages/material-center/KnowledgeTags'
 
 import PlaceholderPage from '@/components/PlaceholderPage'
 import Layout from '@/components/Layout'
@@ -340,6 +343,38 @@ function App() {
               <ProtectedRoute>
                 <Layout>
                   <Debug />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 素材中心 */}
+          <Route
+            path="/material-center/stories"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <Stories />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/material-center/knowledge-points"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <KnowledgePoints />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/material-center/knowledge-tags"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <KnowledgeTags />
                 </Layout>
               </ProtectedRoute>
             }

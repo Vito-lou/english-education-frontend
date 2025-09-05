@@ -62,6 +62,9 @@ const MenuEditor: React.FC<MenuEditorProps> = ({
     { value: 'FileText', label: '📄 文档管理', emoji: '📄' },
     { value: 'BarChart3', label: '📊 统计报表', emoji: '📊' },
     { value: 'Calendar', label: '📅 日程管理', emoji: '📅' },
+    { value: 'Archive', label: '📦 素材中心', emoji: '📦' },
+    { value: 'Brain', label: '🧠 知识点', emoji: '🧠' },
+    { value: 'Tags', label: '🏷️ 标签', emoji: '🏷️' },
   ];
 
   useEffect(() => {
